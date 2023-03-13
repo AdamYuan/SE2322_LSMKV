@@ -3,6 +3,7 @@
 #include <cinttypes>
 #include <filesystem>
 #include <fstream>
+#include <list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -83,11 +84,30 @@ private:
 	size_type m_sorted_table_size;
 
 	struct SortedKeyTable {
+		level_type level;
 		Header header;
 		typename Trait::Bloom bloom;
 		std::unique_ptr<KeyOffset[]> keys;
+
+		inline const KeyOffset *key_begin() const { return keys.get(); }
+		inline const KeyOffset *key_end() const { return keys.get() + header.key_count; }
+		inline const KeyOffset *key_lower_bound(const Key &key) const {
+			const KeyOffset *first = key_begin(), *key_it;
+			size_type count = header.key_count, step;
+			while (count > 0) {
+				step = count >> 1u;
+				key_it = first + step;
+				if (Compare{}(key_it->key, key)) {
+					first = ++key_it;
+					count -= step + 1;
+				} else
+					count = step;
+			}
+			return key_it;
+		}
 	};
-	std::vector<SortedKeyTable> m_key_tables[kLevels + 1];
+	std::list<SortedKeyTable> m_key_tables;
+	std::vector<typename std::list<SortedKeyTable>::iterator> m_levels[kLevels + 1];
 
 	inline std::filesystem::path get_level_dir(level_type level) const {
 		return m_directory / (std::string{"level-"} + std::to_string(level));
@@ -106,8 +126,9 @@ private:
 		return get_level_dir(level) / (std::to_string(time_stap) + ".sst");
 	}
 
-	inline SortedKeyTable load_key_table(const std::filesystem::path &file_path) {
+	inline SortedKeyTable load_key_table(const std::filesystem::path &file_path, level_type level) {
 		SortedKeyTable table = {};
+		table.level = level;
 
 		// Load Header
 		std::ifstream fin{file_path};
@@ -126,6 +147,7 @@ private:
 
 	inline SortedKeyTable store_mem_table() {
 		SortedKeyTable table = {};
+		table.level = 0;
 		table.header.key_count = m_skiplist.GetSize();
 		table.header.time_stamp = m_time_stamp++;
 		table.keys = std::make_unique<KeyOffset[]>(table.header.key_count);
@@ -168,12 +190,13 @@ private:
 	}
 
 	inline void pop_mem_table() {
-		m_key_tables[0].push_back(store_mem_table());
+		m_key_tables.push_front(store_mem_table());
+		m_levels[0].push_back(m_key_tables.begin());
 		m_skiplist.Clear();
 		m_sorted_table_size = kFileInitialSize;
 	}
 
-	inline bool key_equal(const Key &l, const Key &r) const { return !Compare{}(l, r) && !Compare{}(r, l); }
+	inline static bool key_equal(const Key &l, const Key &r) { return !Compare{}(l, r) && !Compare{}(r, l); }
 
 public:
 	inline explicit KV(std::string_view directory)
@@ -191,10 +214,13 @@ public:
 						continue;
 					if (!file.path().has_extension() || file.path().extension() != ".sst")
 						continue;
-					m_key_tables[level].push_back(load_key_table(file));
+					m_key_tables.push_front(load_key_table(file, level));
+					m_levels[level].push_back(m_key_tables.begin());
 				}
 			}
 		}
+		m_key_tables.sort(
+		    [](const SortedKeyTable &l, const SortedKeyTable &r) { return l.header.time_stamp > r.header.time_stamp; });
 	}
 
 	inline ~KV() {
@@ -232,58 +258,58 @@ public:
 		if (opt_opt_value.has_value())
 			return opt_opt_value.value();
 
-		uint64_t target_time_stap = 0u;
+		uint64_t target_time_stamp = 0u;
 		level_type target_level;
 		size_type target_d_offset, target_length;
 
-		for (level_type level = 0; level <= kLevels; ++level) {
-			for (const SortedKeyTable &table : m_key_tables[level]) {
-				const Header &header = table.header;
+		for (const SortedKeyTable &table : m_key_tables) {
+			const Header &header = table.header;
 
-				if (Compare{}(key, header.key_min) || Compare{}(header.key_max, key) ||
-				    header.time_stamp <= target_time_stap)
-					continue;
+			if (Compare{}(key, header.key_min) || Compare{}(header.key_max, key))
+				continue;
 
-				// Binary Search for the Key
-				const KeyOffset *key_begin = table.keys.get(), *key_end = table.keys.get() + header.key_count, *key_it;
-				{ // lower bound
-					const KeyOffset *first = key_begin;
-					size_type count = header.key_count, step;
-					while (count > 0) {
-						step = count >> 1u;
-						key_it = first + step;
-						if (Compare{}(key_it->key, key)) {
-							first = ++key_it;
-							count -= step + 1;
-						} else
-							count = step;
-					}
-				}
-				if (key_it != key_end && key_equal(key_it->key, key)) {
-					target_time_stap = header.time_stamp;
-					target_level = level;
-					target_d_offset = key_it->d_offset;
+			// Binary Search for the Key
+			const KeyOffset *key_it = table.key_lower_bound(key);
+			if (key_it != table.key_end() && key_equal(key_it->key, key)) {
+				target_time_stamp = header.time_stamp;
+				target_level = table.level;
+				target_d_offset = key_it->d_offset;
 
-					++key_it;
-					target_length = key_it == key_end ? -1u : d_offset_get_offset(key_it->d_offset) - target_d_offset;
-				}
+				++key_it;
+				target_length =
+				    key_it == table.key_end() ? -1u : d_offset_get_offset(key_it->d_offset) - target_d_offset;
+
+				break;
 			}
 		}
-		if (target_time_stap == 0 || d_offset_is_deleted(target_d_offset))
+		if (target_time_stamp == 0 || d_offset_is_deleted(target_d_offset))
 			return std::nullopt;
 
-		std::filesystem::path file_path = get_file_path(target_time_stap, target_level);
-		if (target_length == -1) {
+		std::filesystem::path file_path = get_file_path(target_time_stamp, target_level);
+		if (target_length == -1)
 			target_length = std::filesystem::file_size(file_path) - target_d_offset;
-		}
 		std::ifstream fin{file_path, std::ios::binary};
 		fin.seekg(target_d_offset);
 		return ValueIO::Read(fin, target_length);
 	}
 
 	inline bool Delete(Key key) {
-		if (!Get(key).has_value())
+		// Check whether the key is already deleted
+		auto opt_opt_value = m_skiplist.Search(key);
+		if (opt_opt_value.has_value() && !opt_opt_value.value().has_value())
 			return false;
+		for (const SortedKeyTable &table : m_key_tables) {
+			const Header &header = table.header;
+			if (Compare{}(key, header.key_min) || Compare{}(header.key_max, key))
+				continue;
+			// Binary Search for the Key
+			const KeyOffset *key_it = table.key_lower_bound(key);
+			if (key_it != table.key_end() && key_equal(key_it->key, key)) {
+				if (d_offset_is_deleted(key_it->d_offset))
+					return false;
+				break;
+			}
+		}
 
 		if (m_skiplist.Replace(key, [this](std::optional<Value> *p_opt_value, bool exists) -> bool {
 			    size_type new_size = m_sorted_table_size;
@@ -313,7 +339,9 @@ public:
 
 		m_time_stamp = 1;
 		for (level_type level = 0; level <= kLevels; ++level)
-			m_key_tables[level].clear();
+			m_levels[level].clear();
+		m_key_tables.clear();
+
 		if (std::filesystem::exists(m_directory))
 			std::filesystem::remove_all(m_directory);
 		init_directory();
