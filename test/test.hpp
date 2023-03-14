@@ -31,9 +31,9 @@ template <typename Key, typename Value> struct MyTrait {
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
 	constexpr static lsm::level_type kLevels = 5;
-	constexpr static lsm::LevelConfig kLevelConfigs[] = {
-	    {2, lsm::LevelType::kTiering},   {4, lsm::LevelType::kLeveling},  {8, lsm::LevelType::kLeveling},
-	    {16, lsm::LevelType::kLeveling}, {32, lsm::LevelType::kLeveling},
+	constexpr static lsm::KVLevelConfig kLevelConfigs[] = {
+	    {2, lsm::KVLevelType::kTiering},   {4, lsm::KVLevelType::kLeveling},  {8, lsm::KVLevelType::kLeveling},
+	    {16, lsm::KVLevelType::kLeveling}, {32, lsm::KVLevelType::kLeveling},
 	};
 };
 

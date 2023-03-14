@@ -13,3 +13,6 @@ target_link_libraries(lsmkv_test PRIVATE lsmkv)
 
 add_executable(lsmkv_correctness_test test/correctness.cpp)
 target_link_libraries(lsmkv_correctness_test PRIVATE lsmkv)
+
+add_executable(lsmkv_persistence_test test/persistence.cpp)
+target_link_libraries(lsmkv_persistence_test PRIVATE lsmkv)

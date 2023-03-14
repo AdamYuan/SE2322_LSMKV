@@ -16,17 +16,13 @@
 
 namespace lsm {
 
-using size_type = uint32_t;
-using level_type = uint32_t;
-
-enum class LevelType { kTiering, kLeveling };
-
-struct LevelConfig {
+enum class KVLevelType { kTiering, kLeveling };
+struct KVLevelConfig {
 	size_type max_files;
-	LevelType type;
+	KVLevelType type;
 };
 
-template <typename Key, typename Value, typename CompareType = std::less<Key>> struct DefaultTrait {
+template <typename Key, typename Value, typename CompareType = std::less<Key>> struct KVDefaultTrait {
 	using Compare = CompareType;
 	using SkipList = ::lsm::SkipList<Key, std::optional<Value>, std::default_random_engine, 1, 2, 64, Compare>;
 	using Bloom = ::lsm::Bloom<Key, 10240 * 8>;
@@ -34,13 +30,13 @@ template <typename Key, typename Value, typename CompareType = std::less<Key>> s
 	constexpr static size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
 	constexpr static level_type kLevels = 5;
-	constexpr static LevelConfig kLevelConfigs[] = {
-	    {2, LevelType::kTiering},   {4, LevelType::kLeveling},  {8, LevelType::kLeveling},
-	    {16, LevelType::kLeveling}, {32, LevelType::kLeveling},
+	constexpr static KVLevelConfig kLevelConfigs[] = {
+	    {2, KVLevelType::kTiering},   {4, KVLevelType::kLeveling},  {8, KVLevelType::kLeveling},
+	    {16, KVLevelType::kLeveling}, {32, KVLevelType::kLeveling},
 	};
 };
 
-template <typename Key, typename Value, typename Trait = DefaultTrait<Key, Value>> class KV {
+template <typename Key, typename Value, typename Trait = KVDefaultTrait<Key, Value>> class KV {
 	static_assert(std::is_integral_v<Key>);
 
 private:
@@ -65,7 +61,7 @@ private:
 	constexpr static size_type kFileInitialSize = BloomIO::GetSize({}) + HeaderIO::GetSize({});
 
 	constexpr static level_type kLevels = Trait::kLevels;
-	constexpr static LevelConfig *kLevelConfigs = Trait::kLevelConfigs;
+	constexpr static KVLevelConfig *kLevelConfigs = Trait::kLevelConfigs;
 
 	inline static size_type make_d_offset(size_type offset, bool deleted) {
 		return (offset & 0x7fffffffu) | (deleted ? 0x80000000u : 0u);
@@ -138,7 +134,7 @@ private:
 
 		table.keys = std::make_unique<KeyOffset[]>(table.header.key_count);
 
-		fin.seekg(kFileInitialSize);
+		// fin.seekg(kFileInitialSize);
 		for (size_type key_id = 0; key_id < table.header.key_count; ++key_id)
 			table.keys[key_id] = KeyOffsetIO::Read(fin);
 
@@ -183,10 +179,11 @@ private:
 			}
 		});
 
-		// Write Header
+		// Write Header and Bloom
 		fout.seekp(0);
 		HeaderIO::Write(fout, table.header);
 		BloomIO::Write(fout, table.bloom);
+
 		return table;
 	}
 
