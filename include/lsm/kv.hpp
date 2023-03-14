@@ -11,9 +11,8 @@
 #include <type_traits>
 
 #include "bloom.hpp"
+#include "io.hpp"
 #include "skiplist.hpp"
-
-#include "lsmkv_io.hpp"
 
 namespace lsm {
 
@@ -28,10 +27,9 @@ struct LevelConfig {
 };
 
 template <typename Key, typename Value, typename CompareType = std::less<Key>> struct DefaultTrait {
-	using RandomGenerator = std::default_random_engine;
 	using Compare = CompareType;
-	using SkipList = ::lsm::SkipList<Key, std::optional<Value>, RandomGenerator, 1, 2, 64, Compare>;
-	using Bloom = ::lsm::Bloom<Key, 10240 * 8, 3>;
+	using SkipList = ::lsm::SkipList<Key, std::optional<Value>, std::default_random_engine, 1, 2, 64, Compare>;
+	using Bloom = ::lsm::Bloom<Key, 10240 * 8>;
 	using ValueIO = DefaultIO<Value>;
 	constexpr static size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
@@ -61,9 +59,10 @@ private:
 #pragma pack(pop)
 	using KeyOffsetIO = DefaultIO<KeyOffset>;
 	using HeaderIO = DefaultIO<Header>;
+	using BloomIO = DefaultIO<typename Trait::Bloom>;
 	using ValueIO = typename Trait::ValueIO;
 	constexpr static size_type kSingleFileSizeLimit = Trait::kSingleFileSizeLimit;
-	constexpr static size_type kFileInitialSize = Trait::Bloom::GetBytes() + HeaderIO::GetSize({});
+	constexpr static size_type kFileInitialSize = BloomIO::GetSize({}) + HeaderIO::GetSize({});
 
 	constexpr static level_type kLevels = Trait::kLevels;
 	constexpr static LevelConfig *kLevelConfigs = Trait::kLevelConfigs;
@@ -133,6 +132,7 @@ private:
 		// Load Header
 		std::ifstream fin{file_path};
 		table.header = HeaderIO::Read(fin);
+		table.bloom = BloomIO::Read(fin);
 
 		m_time_stamp = std::max(table.header.time_stamp + 1, m_time_stamp);
 
@@ -166,6 +166,7 @@ private:
 			}
 			table.header.key_max = key;
 
+			table.bloom.Insert(key);
 			table.keys[key_id].key = key;
 			table.keys[key_id].d_offset = make_d_offset(value_pos, !value_opt.has_value());
 
@@ -185,7 +186,7 @@ private:
 		// Write Header
 		fout.seekp(0);
 		HeaderIO::Write(fout, table.header);
-
+		BloomIO::Write(fout, table.bloom);
 		return table;
 	}
 
@@ -267,6 +268,8 @@ public:
 
 			if (Compare{}(key, header.key_min) || Compare{}(header.key_max, key))
 				continue;
+			if (!table.bloom.Exist(key))
+				continue;
 
 			// Binary Search for the Key
 			const KeyOffset *key_it = table.key_lower_bound(key);
@@ -301,6 +304,8 @@ public:
 		for (const SortedKeyTable &table : m_key_tables) {
 			const Header &header = table.header;
 			if (Compare{}(key, header.key_min) || Compare{}(header.key_max, key))
+				continue;
+			if (!table.bloom.Exist(key))
 				continue;
 			// Binary Search for the Key
 			const KeyOffset *key_it = table.key_lower_bound(key);

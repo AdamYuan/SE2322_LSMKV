@@ -4,7 +4,38 @@
 #include <iostream>
 #include <string>
 
-#include <lsmkv.hpp>
+#include <lsm/kv.hpp>
+
+#include "MurmurHash3.h"
+template <typename Key> struct Murmur3BloomHasher {
+	template <std::size_t Bits, typename Array> inline static void Insert(Array &array, const Key &key) {
+		uint32_t hashes[4];
+		MurmurHash3_x64_128(&key, sizeof(Key), 1, hashes);
+		array[hashes[0] % Bits] = true;
+		array[hashes[1] % Bits] = true;
+		array[hashes[2] % Bits] = true;
+		array[hashes[3] % Bits] = true;
+	}
+	template <std::size_t Bits, typename Array> inline static bool Exist(const Array &array, const Key &key) {
+		uint32_t hashes[4];
+		MurmurHash3_x64_128(&key, sizeof(Key), 1, hashes);
+		return array[hashes[0] % Bits] && array[hashes[1] % Bits] && array[hashes[2] % Bits] && array[hashes[3] % Bits];
+	}
+};
+
+template <typename Key, typename Value> struct MyTrait {
+	using Compare = std::less<Key>;
+	using SkipList = lsm::SkipList<Key, std::optional<Value>, std::default_random_engine, 1, 2, 64, Compare>;
+	using Bloom = lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>;
+	using ValueIO = lsm::DefaultIO<Value>;
+	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
+
+	constexpr static lsm::level_type kLevels = 5;
+	constexpr static lsm::LevelConfig kLevelConfigs[] = {
+	    {2, lsm::LevelType::kTiering},   {4, lsm::LevelType::kLeveling},  {8, lsm::LevelType::kLeveling},
+	    {16, lsm::LevelType::kLeveling}, {32, lsm::LevelType::kLeveling},
+	};
+};
 
 class Test {
 protected:
@@ -66,7 +97,7 @@ protected:
 		}
 	}
 
-	void phase(void) {
+	void phase() {
 		// Report
 		std::cout << "  Phase " << (nr_phases + 1) << ": ";
 		std::cout << nr_passed_tests << "/" << nr_tests << " ";
@@ -95,7 +126,7 @@ protected:
 		nr_passed_phases = 0;
 	}
 
-	lsm::KV<uint64_t, std::string> store;
+	lsm::KV<uint64_t, std::string, MyTrait<uint64_t, std::string>> store;
 	bool verbose;
 
 public:

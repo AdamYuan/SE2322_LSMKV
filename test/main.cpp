@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include <lsmkv.hpp>
+#include "lsm/kv.hpp"
 
 int main() {
 	lsm::KV<uint64_t, std::string> lsmkv("data_dir");
