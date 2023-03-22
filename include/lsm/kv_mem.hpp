@@ -73,10 +73,8 @@ public:
 				    new_size -= p_opt_value->has_value() ? ValueIO::GetSize(p_opt_value->value()) : 0;
 			    else
 				    new_size += sizeof(KeyOffset);
-
 			    if (new_size > kMaxFileSize)
 				    return false;
-
 			    *p_opt_value = std::nullopt;
 			    m_sorted_table_size = new_size;
 			    return true;

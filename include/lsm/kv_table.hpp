@@ -143,6 +143,23 @@ public:
 	}
 };
 
+template <typename Key, typename Value, typename KeyTable, typename ValueTable> class KVTableIterator {
+private:
+	const KeyTable &m_key_table;
+	const ValueTable &m_value_table;
+	const KVKeyOffset<Key> *const m_key_offset;
+
+public:
+	inline KVTableIterator(const KeyTable &key_table, const ValueTable &value_table, const KVKeyOffset<Key> *key_offset)
+	    : m_key_table{key_table}, m_value_table{value_table}, m_key_offset{key_offset} {}
+	inline bool IsDeleted() const { return m_key_offset->IsDeleted(); }
+	inline Value GetValue() const {
+		const KVKeyOffset<Key> *key_nxt = m_key_offset + 1;
+		return m_value_table.Read(m_key_offset->GetOffset(),
+		                          key_nxt == m_key_table.GetEnd() ? -1 : key_nxt->GetOffset());
+	}
+};
+
 template <typename Key, typename Value, typename Trait> class KVBufferTable {
 private:
 	using KeyTable = KVKeyTable<Key, Trait>;
@@ -154,12 +171,18 @@ private:
 	template <typename, typename, typename> friend class KVFileTable;
 
 public:
+	using Iterator = KVTableIterator<Key, Value, KeyTable, ValueBuffer>;
+
 	inline KVBufferTable(KeyTable &&keys, ValueBuffer &&values)
 	    : m_keys{std::move(keys)}, m_values{std::move(values)} {}
 
 	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
-	inline const auto &GetKeys() const { return m_keys; }
-	inline const auto &GetValues() const { return m_values; }
+	inline std::optional<Iterator> Find(Key key) const {
+		const KVKeyOffset<Key> *key_it = m_keys.Find(key);
+		if (key_it == nullptr)
+			return std::nullopt;
+		return Iterator{m_keys, m_values, key_it};
+	}
 };
 
 template <typename Key, typename Value, typename Trait> class KVFileTable {
@@ -171,24 +194,32 @@ private:
 	ValueFile m_values;
 
 public:
+	using Iterator = KVTableIterator<Key, Value, KeyTable, ValueFile>;
+
 	inline KVFileTable(const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer)
-	    : m_values{file_path, IO<KeyTable>::GetSize(buffer.GetKeys()), buffer.GetValues().GetSize()} {
+	    : m_values{file_path, IO<KeyTable>::GetSize(buffer.m_keys), buffer.m_values.GetSize()} {
 		m_keys = std::move(buffer.m_keys);
 		std::ofstream fout{file_path, std::ios::binary};
 		IO<KeyTable>::Write(fout, m_keys);
-		fout.write((char *)buffer.GetValues().GetData(), buffer.GetValues().GetSize());
+		fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
 	}
 	inline explicit KVFileTable(const std::filesystem::path &file_path) {
-		std::ifstream fin{file_path, std::ios::binary};
-		m_keys = IO<KeyTable>::Read(fin);
+		{
+			std::ifstream fin{file_path, std::ios::binary};
+			m_keys = IO<KeyTable>::Read(fin);
+		}
 		size_type value_offset = IO<KeyTable>::GetSize(m_keys);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
 		m_values = ValueFile{file_path, value_offset, value_size};
 	}
 
 	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
-	inline const KeyTable &GetKeys() const { return m_keys; }
-	inline const ValueFile &GetValues() const { return m_values; }
+	inline std::optional<Iterator> Find(Key key) const {
+		const KVKeyOffset<Key> *key_it = m_keys.Find(key);
+		if (key_it == nullptr)
+			return std::nullopt;
+		return Iterator{m_keys, m_values, key_it};
+	}
 };
 
 } // namespace lsm

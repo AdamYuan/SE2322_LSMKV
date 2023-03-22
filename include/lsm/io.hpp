@@ -4,8 +4,6 @@
 #include <streambuf>
 #include <string>
 
-#include <mio/mio.hpp>
-
 #include "type.hpp"
 
 namespace lsm {

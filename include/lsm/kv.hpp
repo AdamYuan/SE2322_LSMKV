@@ -100,15 +100,12 @@ public:
 			return opt_opt_value.value();
 
 		for (const FileTable &table : m_file_tables) {
-			const KeyOffset *key_it = table.GetKeys().Find(key);
-			if (key_it == nullptr)
+			auto opt_it = table.Find(key);
+			if (!opt_it.has_value())
 				continue;
-
-			if (key_it->IsDeleted())
+			if (opt_it.value().IsDeleted())
 				return std::nullopt;
-			const KeyOffset *key_nxt = key_it + 1;
-			return table.GetValues().Read(key_it->GetOffset(),
-			                              key_nxt == table.GetKeys().GetEnd() ? -1 : key_nxt->GetOffset());
+			return opt_it.value().GetValue();
 		}
 		return std::nullopt;
 	}
@@ -121,10 +118,10 @@ public:
 				return false;
 		} else {
 			for (const FileTable &table : m_file_tables) {
-				const KeyOffset *key_it = table.GetKeys().Find(key);
-				if (key_it == nullptr)
+				auto opt_it = table.Find(key);
+				if (!opt_it.has_value())
 					continue;
-				if (key_it->IsDeleted())
+				if (opt_it.value().IsDeleted())
 					return false;
 				break;
 			}
