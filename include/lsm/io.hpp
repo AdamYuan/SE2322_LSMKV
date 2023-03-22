@@ -4,11 +4,30 @@
 #include <streambuf>
 #include <string>
 
+#include <mio/mio.hpp>
+
 #include "type.hpp"
 
 namespace lsm {
 
-template <typename Type> struct DefaultIO {
+struct IBufStream {
+	const char *buffer;
+	size_type pos;
+	inline void read(char *dst, size_type len) {
+		std::copy(buffer + pos, buffer + pos + len, dst);
+		pos += len;
+	}
+};
+struct OBufStream {
+	char *buffer;
+	size_type pos;
+	inline void write(const char *src, size_type len) {
+		std::copy(src, src + len, buffer + pos);
+		pos += len;
+	}
+};
+
+template <typename Type> struct IO {
 	inline static constexpr size_type GetSize(const Type &) { return sizeof(Type); }
 	template <typename Stream> inline static void Write(Stream &ostr, const Type &val) {
 		const char *src = (const char *)(&val);
@@ -21,7 +40,7 @@ template <typename Type> struct DefaultIO {
 	}
 };
 
-template <> struct DefaultIO<std::string> {
+template <> struct IO<std::string> {
 	inline static size_type GetSize(const std::string &str) { return str.length(); }
 	template <typename Stream> inline static void Write(Stream &ostr, const std::string &str) {
 		ostr.write(str.data(), str.length());

@@ -1,5 +1,4 @@
-#ifndef SKIPLIST_HPP
-#define SKIPLIST_HPP
+#pragma once
 
 #include <cinttypes>
 #include <optional>
@@ -159,10 +158,9 @@ public:
 		return replace_impl(Key(key), std::forward<Replacer>(replacer));
 	}
 	inline size_type GetSize() const { return m_size; }
+	inline bool IsEmpty() const { return m_size == 0; }
 	inline level_type GetLevel() const { return m_level; }
 	template <typename Func> inline void ForEach(Func &&func) const { for_each_impl(std::forward<Func>(func)); }
 };
 
 } // namespace lsm
-
-#endif

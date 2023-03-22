@@ -27,7 +27,7 @@ template <typename Key, typename Value> struct MyTrait {
 	using Compare = std::less<Key>;
 	using SkipList = lsm::SkipList<Key, std::optional<Value>, std::default_random_engine, 1, 2, 64, Compare>;
 	using Bloom = lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>;
-	using ValueIO = lsm::DefaultIO<Value>;
+	using ValueIO = lsm::IO<Value>;
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
 	constexpr static lsm::level_type kLevels = 5;

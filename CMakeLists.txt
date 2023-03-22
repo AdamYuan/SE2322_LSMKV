@@ -5,7 +5,7 @@ project(LSMKV)
 set(CMAKE_CXX_STANDARD 17)
 
 add_library(lsmkv INTERFACE)
-target_include_directories(lsmkv INTERFACE include)
+target_include_directories(lsmkv INTERFACE include dep)
 target_link_libraries(lsmkv INTERFACE stdc++fs)
 
 add_executable(lsmkv_test test/main.cpp)

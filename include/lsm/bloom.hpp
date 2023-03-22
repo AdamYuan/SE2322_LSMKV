@@ -1,5 +1,4 @@
-#ifndef BLOOM_HPP
-#define BLOOM_HPP
+#pragma once
 
 #include <bitset>
 #include <functional>
@@ -44,7 +43,6 @@ private:
 
 public:
 	inline static constexpr size_type GetBits() { return Bits; }
-	// inline static constexpr size_type GetBytes() { return (Bits / 8) + (Bits % 8 ? 1 : 0); }
 
 	inline Bloom() = default;
 	inline void Insert(const Key &key) { Hasher::template Insert<Bits>(m_bits, key); }
@@ -53,7 +51,7 @@ public:
 	inline const std::bitset<Bits> &GetBitset() const { return m_bits; }
 };
 
-template <typename Key, size_type Bits, typename Hasher> struct DefaultIO<Bloom<Key, Bits, Hasher>> {
+template <typename Key, size_type Bits, typename Hasher> struct IO<Bloom<Key, Bits, Hasher>> {
 private:
 	inline static constexpr size_type get_u64s() { return (Bits >> 6u) + ((Bits & 63u) ? 1 : 0); }
 
@@ -64,13 +62,13 @@ public:
 	template <typename Stream> inline static void Write(Stream &ostr, const Bloom<Key, Bits, Hasher> &bloom) {
 		for (size_type i = 0; i < get_u64s(); ++i) {
 			uint64_t u64 = ((bloom.GetBitset() >> (i << 6u)) & std::bitset<Bits>(0xffffffffffffffffULL)).to_ullong();
-			DefaultIO<uint64_t>::Write(ostr, u64);
+			IO<uint64_t>::Write(ostr, u64);
 		}
 	}
 	template <typename Stream> inline static Bloom<Key, Bits, Hasher> Read(Stream &istr, size_type = 0) {
 		Bloom<Key, Bits, Hasher> bloom{};
 		for (size_type i = 0; i < get_u64s(); ++i) {
-			uint64_t u64 = DefaultIO<uint64_t>::Read(istr);
+			uint64_t u64 = IO<uint64_t>::Read(istr);
 			bloom.GetBitset() |= (std::bitset<Bits>(u64) << (i << 6u));
 		}
 		return bloom;
@@ -78,5 +76,3 @@ public:
 };
 
 } // namespace lsm
-
-#endif
