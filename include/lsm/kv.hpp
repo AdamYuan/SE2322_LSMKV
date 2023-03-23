@@ -32,8 +32,7 @@ private:
 	time_type m_time_stamp;
 
 	MemSkipList m_mem_skiplist;
-	std::list<FileTable> m_file_tables;
-	std::vector<typename std::list<FileTable>::iterator> m_levels[kLevels + 1];
+	std::vector<FileTable> m_levels[kLevels + 1];
 
 	inline std::filesystem::path get_level_dir(level_type level) const {
 		return m_directory / (std::string{"level-"} + std::to_string(level));
@@ -56,37 +55,32 @@ private:
 
 		if constexpr (Level == kLevels) {
 			for (auto &buffer_table : src_buffer_tables)
-				level_vec.push_back(m_file_tables.insert(
-				    m_file_tables.end(),
-				    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)}));
+				level_vec.push_back(
+				    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
 			return {};
 		} else {
 			if (level_vec.size() + src_buffer_tables.size() <= kLevelConfigs[Level].max_files) {
 				for (auto &buffer_table : src_buffer_tables)
-					level_vec.push_back(m_file_tables.insert(
-					    m_file_tables.end(),
-					    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)}));
+					level_vec.push_back(
+					    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
 				return {};
 			}
 
 			std::list<FileTable> src_file_tables;
 			if constexpr (kLevelConfigs[Level].type == KVLevelType::kTiering) {
-				for (const auto &it : level_vec) {
-					src_file_tables.push_back(std::move(*it));
-					m_file_tables.erase(it);
-				}
+				for (auto &table : level_vec)
+					src_file_tables.push_back(std::move(table));
 				level_vec.clear();
 			} else { // Leveling
 				while (level_vec.size() < kLevelConfigs[Level].max_files) {
-					level_vec.push_back(m_file_tables.insert(
-					    m_file_tables.end(), FileTable{get_file_path(src_buffer_tables.front().GetTimeStamp(), Level),
-					                                   std::move(src_buffer_tables.front())}));
+					auto &buffer_table = src_buffer_tables.front();
+					level_vec.push_back(
+					    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
 					src_buffer_tables.pop_front();
 				}
 				while (level_vec.size() > kLevelConfigs[Level].max_files) {
-					const auto &it = level_vec.back();
-					src_file_tables.push_back(std::move(*it));
-					m_file_tables.erase(it);
+					auto &table = level_vec.back();
+					src_file_tables.push_back(std::move(table));
 					level_vec.pop_back();
 				}
 			}
@@ -97,15 +91,14 @@ private:
 				next_level_vec.erase(
 				    std::remove_if(
 				        next_level_vec.begin(), next_level_vec.end(),
-				        [this, &src_file_tables, &src_buffer_tables, &next_src_file_tables](const auto &table_it) {
-					        const auto check_overlap = [&table_it](const auto &src_table) {
-						        return table_it->IsOverlap(src_table);
+				        [this, &src_file_tables, &src_buffer_tables, &next_src_file_tables](auto &table) {
+					        const auto check_overlap = [&table](const auto &src_table) {
+						        return table.IsOverlap(src_table);
 					        };
 					        if (std::none_of(src_file_tables.begin(), src_file_tables.end(), check_overlap) &&
 					            std::none_of(src_buffer_tables.begin(), src_buffer_tables.end(), check_overlap))
 						        return false;
-					        next_src_file_tables.push_back(std::move(*table_it));
-					        m_file_tables.erase(table_it);
+					        next_src_file_tables.push_back(std::move(table));
 					        return true;
 				        }),
 				    next_level_vec.end());
@@ -132,13 +125,10 @@ private:
 		for (const auto &file_path : deleted_file_paths)
 			std::filesystem::remove(file_path);
 
-		if (!std::is_sorted(m_file_tables.begin(), m_file_tables.end(),
-		                    [](const FileTable &l, const FileTable &r) { return l.GetTimeStamp() < r.GetTimeStamp(); }))
-			printf("Main List Not sorted\n");
 		for (level_type l = 0; l <= kLevels; ++l) {
 			const auto &level_vec = m_levels[l];
 			if (!std::is_sorted(level_vec.begin(), level_vec.end(),
-			                    [](const auto &l, const auto &r) { return l->GetTimeStamp() < r->GetTimeStamp(); }))
+			                    [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); }))
 				printf("Level %d not sorted\n", l);
 		}
 	}
@@ -161,14 +151,13 @@ public:
 						continue;
 					auto file_table = FileTable{file.path()};
 					m_time_stamp = std::max(m_time_stamp, file_table.GetTimeStamp() + 1);
-					m_levels[level].push_back(m_file_tables.insert(m_file_tables.end(), std::move(file_table)));
+					m_levels[level].push_back(std::move(file_table));
 				}
 			}
 		}
-		m_file_tables.sort([](const FileTable &l, const FileTable &r) { return l.GetTimeStamp() < r.GetTimeStamp(); });
 		for (auto &level_vec : m_levels)
 			std::sort(level_vec.begin(), level_vec.end(),
-			          [](const auto &l, const auto &r) { return l->GetTimeStamp() < r->GetTimeStamp(); });
+			          [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); });
 	}
 
 	inline ~KV() {
@@ -191,13 +180,15 @@ public:
 		if (opt_opt_value.has_value())
 			return opt_opt_value.value();
 
-		for (auto table_it = m_file_tables.rbegin(); table_it != m_file_tables.rend(); ++table_it) {
-			auto it = table_it->Find(key);
-			if (!it.IsValid())
-				continue;
-			if (it.IsKeyDeleted())
-				return std::nullopt;
-			return it.ReadValue();
+		for (const auto &level_vec : m_levels) {
+			for (size_type i = level_vec.size() - 1; ~i; --i) {
+				auto it = level_vec[i].Find(key);
+				if (!it.IsValid())
+					continue;
+				if (it.IsKeyDeleted())
+					return std::nullopt;
+				return it.ReadValue();
+			}
 		}
 		return std::nullopt;
 	}
@@ -209,16 +200,18 @@ public:
 			if (!opt_opt_value.value().has_value())
 				return false;
 		} else {
-			for (auto table_it = m_file_tables.rbegin(); table_it != m_file_tables.rend(); ++table_it) {
-				auto it = table_it->Find(key);
-				if (!it.IsValid())
-					continue;
-				if (it.IsKeyDeleted())
-					return false;
-				break;
+			for (const auto &level_vec : m_levels) {
+				for (size_type i = level_vec.size() - 1; ~i; --i) {
+					auto it = level_vec[i].Find(key);
+					if (!it.IsValid())
+						continue;
+					if (it.IsKeyDeleted())
+						return false;
+					goto End_Check;
+				}
 			}
 		}
-
+	End_Check:
 		std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Delete(key, m_time_stamp);
 		if (opt_buffer_table.has_value()) {
 			++m_time_stamp;
@@ -233,7 +226,6 @@ public:
 		m_time_stamp = 1;
 		for (level_type level = 0; level <= kLevels; ++level)
 			m_levels[level].clear();
-		m_file_tables.clear();
 
 		if (std::filesystem::exists(m_directory))
 			std::filesystem::remove_all(m_directory);
