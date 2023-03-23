@@ -19,7 +19,6 @@ namespace lsm {
 
 template <typename Key, typename Value, typename Trait = KVDefaultTrait<Key, Value>> class KV {
 	static_assert(std::is_integral_v<Key>);
-
 private:
 	constexpr static level_type kLevels = Trait::kLevels;
 	constexpr static const KVLevelConfig *kLevelConfigs = Trait::kLevelConfigs;
@@ -29,10 +28,10 @@ private:
 	using MemSkipList = KVMemSkipList<Key, Value, Trait>;
 
 	std::filesystem::path m_directory;
-	time_type m_time_stamp;
 
 	MemSkipList m_mem_skiplist;
 	std::vector<FileTable> m_levels[kLevels + 1];
+	time_type m_level_time_stamps[kLevels + 1];
 
 	inline std::filesystem::path get_level_dir(level_type level) const {
 		return m_directory / (std::string{"level-"} + std::to_string(level));
@@ -48,6 +47,11 @@ private:
 			if (!std::filesystem::exists(get_level_dir(level)))
 				std::filesystem::create_directory(get_level_dir(level));
 		}
+	}
+	inline void init_time_stamps() {
+		constexpr time_type kUnit = (std::numeric_limits<time_type>::max() - 1) / (kLevels + 1);
+		for (level_type l = 0; l <= kLevels; ++l)
+			m_level_time_stamps[l] = kUnit * (kLevels - l) + 1;
 	}
 	template <level_type Level>
 	std::list<std::filesystem::path> compaction(std::list<BufferTable> &&src_buffer_tables) {
@@ -109,9 +113,10 @@ private:
 			for (const auto &table : src_file_tables)
 				deleted_file_paths.push_back(table.GetFilePath());
 
-			KVMerger<Key, Value, Trait> merger{std::move(src_file_tables), std::move(src_buffer_tables), m_time_stamp};
+			KVMerger<Key, Value, Trait> merger{std::move(src_file_tables), std::move(src_buffer_tables),
+			                                   m_level_time_stamps[Level + 1]};
 			auto dst_buffer_tables = merger.template Run<Level + 1 == kLevels>();
-			m_time_stamp += dst_buffer_tables.size();
+			m_level_time_stamps[Level + 1] += dst_buffer_tables.size();
 
 			deleted_file_paths.splice(deleted_file_paths.end(), compaction<Level + 1>(std::move(dst_buffer_tables)));
 			return deleted_file_paths;
@@ -124,17 +129,11 @@ private:
 
 		for (const auto &file_path : deleted_file_paths)
 			std::filesystem::remove(file_path);
-
-		for (level_type l = 0; l <= kLevels; ++l) {
-			const auto &level_vec = m_levels[l];
-			if (!std::is_sorted(level_vec.begin(), level_vec.end(),
-			                    [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); }))
-				printf("Level %d not sorted\n", l);
-		}
 	}
 
 public:
-	inline explicit KV(std::string_view directory) : m_directory{directory}, m_time_stamp{1} {
+	inline explicit KV(std::string_view directory) : m_directory{directory} {
+		init_time_stamps();
 		init_directory();
 		for (const auto &level_dir : std::filesystem::directory_iterator(m_directory)) {
 			if (!level_dir.is_directory())
@@ -150,7 +149,7 @@ public:
 					if (!file.path().has_extension() || file.path().extension() != ".sst")
 						continue;
 					auto file_table = FileTable{file.path()};
-					m_time_stamp = std::max(m_time_stamp, file_table.GetTimeStamp() + 1);
+					m_level_time_stamps[level] = std::max(m_level_time_stamps[level], file_table.GetTimeStamp() + 1);
 					m_levels[level].push_back(std::move(file_table));
 				}
 			}
@@ -162,13 +161,13 @@ public:
 
 	inline ~KV() {
 		if (!m_mem_skiplist.IsEmpty())
-			FileTable{get_file_path(m_time_stamp, 0), m_mem_skiplist.PopBuffer(m_time_stamp)};
+			FileTable{get_file_path(m_level_time_stamps[0], 0), m_mem_skiplist.PopBuffer(m_level_time_stamps[0])};
 	}
 
 	inline void Put(Key key, Value &&value) {
-		std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Put(key, std::move(value), m_time_stamp);
+		std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Put(key, std::move(value), m_level_time_stamps[0]);
 		if (opt_buffer_table.has_value()) {
-			++m_time_stamp;
+			++m_level_time_stamps[0];
 			store_buffer_table(std::move(opt_buffer_table.value()));
 		}
 	}
@@ -212,9 +211,9 @@ public:
 			}
 		}
 	End_Check:
-		std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Delete(key, m_time_stamp);
+		std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Delete(key, m_level_time_stamps[0]);
 		if (opt_buffer_table.has_value()) {
-			++m_time_stamp;
+			++m_level_time_stamps[0];
 			store_buffer_table(std::move(opt_buffer_table.value()));
 		}
 		return true;
@@ -223,13 +222,14 @@ public:
 	inline void Reset() {
 		m_mem_skiplist.Reset();
 
-		m_time_stamp = 1;
 		for (level_type level = 0; level <= kLevels; ++level)
 			m_levels[level].clear();
 
 		if (std::filesystem::exists(m_directory))
 			std::filesystem::remove_all(m_directory);
+
 		init_directory();
+		init_time_stamps();
 	}
 };
 

@@ -152,11 +152,12 @@ template <typename Key, typename Value, typename Trait, typename Table> class KV
 private:
 	const Table *m_p_table;
 	const KVKeyOffset<Key> *m_p_key_offset;
+	time_type m_time_stamp;
 
 public:
 	inline KVTableIterator(const Table *p_table, const KVKeyOffset<Key> *p_key_offset)
-	    : m_p_table{p_table}, m_p_key_offset{p_key_offset} {}
-	inline time_type GetTimeStamp() const { return m_p_table->GetTimeStamp(); }
+	    : m_p_table{p_table}, m_p_key_offset{p_key_offset}, m_time_stamp{m_p_table->GetTimeStamp()} {}
+	inline time_type GetTimeStamp() const { return m_time_stamp; }
 	inline bool IsValid() const { return m_p_key_offset != m_p_table->m_keys.GetEnd(); }
 	inline bool IsKeyDeleted() const { return m_p_key_offset->IsDeleted(); }
 	inline Key GetKey() const { return m_p_key_offset->GetKey(); }
