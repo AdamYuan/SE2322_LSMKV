@@ -1,11 +1,13 @@
 #pragma once
 
+#include <vector>
+
 #include "kv_table.hpp"
 #include "kv_trait.hpp"
 
 namespace lsm {
 
-template <typename Key, typename Value, typename Trait> class KVMem {
+template <typename Key, typename Value, typename Trait> class KVMemSkipList {
 private:
 	using Buffer = KVBufferTable<Key, Value, Trait>;
 	using ValueIO = typename Trait::ValueIO;
@@ -89,6 +91,66 @@ public:
 	}
 	inline std::optional<std::optional<Value>> Get(Key key) const { return m_skiplist.Search(key); }
 	inline bool IsEmpty() const { return m_skiplist.IsEmpty(); }
+};
+
+template <typename Key, typename Value, typename Trait> class KVMemAppender {
+private:
+	using BufferTable = KVBufferTable<Key, Value, Trait>;
+	using KeyOffset = KVKeyOffset<Key>;
+
+	constexpr static size_type kMaxFileSize = Trait::kSingleFileSizeLimit;
+	constexpr static size_type kInitialFileSize =
+	    sizeof(time_type) + sizeof(size_type) + sizeof(Key) * 2 + IO<typename Trait::Bloom>::GetSize({});
+
+	std::vector<KeyOffset> m_key_offset_vec;
+	std::vector<byte> m_value_buffer;
+	size_type m_sorted_table_size{kInitialFileSize};
+
+public:
+	inline KVMemAppender() { m_value_buffer.reserve(kMaxFileSize); }
+	inline void Reset() {
+		m_sorted_table_size = kInitialFileSize;
+		m_key_offset_vec.clear();
+		m_value_buffer.clear();
+	}
+	inline BufferTable PopBuffer(time_type time_stamp) {
+		auto key_buffer = std::make_unique<KeyOffset[]>(m_key_offset_vec.size());
+		std::copy(m_key_offset_vec.begin(), m_key_offset_vec.end(), key_buffer.get());
+		auto value_buffer = std::make_unique<byte[]>(m_value_buffer.size());
+		std::copy(m_value_buffer.begin(), m_value_buffer.end(), value_buffer.get());
+		return BufferTable{
+		    KVKeyTable<Key, Trait>{time_stamp, std::move(key_buffer), (size_type)m_key_offset_vec.size()},
+		    KVValueBuffer<Value, Trait>{std::move(value_buffer), (size_type)m_value_buffer.size()}};
+	}
+	template <bool Delete, typename Iterator>
+	inline std::optional<BufferTable> Append(const Iterator &it, time_type time_stamp) {
+		if constexpr (Delete) {
+			if (it.IsKeyDeleted())
+				return std::nullopt;
+		}
+		size_type value_size = it.GetValueSize();
+		size_type new_size = m_sorted_table_size + sizeof(KeyOffset) + value_size;
+		if (new_size <= kMaxFileSize) {
+			m_sorted_table_size = new_size;
+			m_key_offset_vec.emplace_back(it.GetKey(), m_value_buffer.size(), it.IsKeyDeleted());
+			if (value_size) {
+				size_type prev_size = m_value_buffer.size();
+				m_value_buffer.resize(prev_size + value_size);
+				it.CopyValueData((char *)m_value_buffer.data() + prev_size);
+			}
+			return std::nullopt;
+		}
+		auto ret = PopBuffer(time_stamp);
+		Reset();
+		m_sorted_table_size += sizeof(KeyOffset) + value_size;
+		m_key_offset_vec.emplace_back(it.GetKey(), m_value_buffer.size(), it.IsKeyDeleted());
+		if (value_size) {
+			m_value_buffer.resize(value_size);
+			it.CopyValueData((char *)m_value_buffer.data());
+		}
+		return {std::move(ret)};
+	}
+	inline bool IsEmpty() const { return m_key_offset_vec.empty(); }
 };
 
 } // namespace lsm

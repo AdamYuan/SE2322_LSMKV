@@ -49,6 +49,7 @@ public:
 	inline bool Exist(const Key &key) const { return Hasher::template Exist<Bits>(m_bits, key); }
 	inline std::bitset<Bits> &GetBitset() { return m_bits; }
 	inline const std::bitset<Bits> &GetBitset() const { return m_bits; }
+	inline void Clear() { m_bits.reset(); }
 };
 
 template <typename Key, size_type Bits, typename Hasher> struct IO<Bloom<Key, Bits, Hasher>> {

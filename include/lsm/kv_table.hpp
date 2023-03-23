@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <utility>
-#include <variant>
 
 #include "io.hpp"
 #include "kv_trait.hpp"
@@ -52,7 +51,6 @@ public:
 	inline size_type GetCount() const { return m_count; }
 	inline Key GetMin() const { return m_min; }
 	inline Key GetMax() const { return m_max; }
-	inline const auto &GetBloom() const { return m_bloom; }
 	inline bool IsExcluded(Key key) const {
 		return Compare{}(key, m_min) || Compare{}(m_max, key) || !m_bloom.Exist(key);
 	}
@@ -60,7 +58,7 @@ public:
 	inline const KeyOffset *GetEnd() const { return m_keys.get() + m_count; }
 	inline const KeyOffset *Find(Key key) const {
 		if (IsExcluded(key))
-			return nullptr;
+			return GetEnd();
 		const KeyOffset *first = GetBegin(), *key_it;
 		size_type count = m_count, step;
 		while (count > 0) {
@@ -72,8 +70,7 @@ public:
 			} else
 				count = step;
 		}
-		return key_it == GetEnd() || Compare{}(key_it->GetKey(), key) || Compare{}(key, key_it->GetKey()) ? nullptr
-		                                                                                                  : key_it;
+		return Compare{}(key_it->GetKey(), key) || Compare{}(key, key_it->GetKey()) ? GetEnd() : key_it;
 	}
 };
 
@@ -114,10 +111,13 @@ public:
 	inline KVValueBuffer(std::unique_ptr<byte[]> &&bytes, size_type size) : m_bytes{std::move(bytes)}, m_size{size} {}
 
 	inline size_type GetSize() const { return m_size; }
-	inline Value Read(size_type begin, size_type end = -1) const {
-		size_type len = (~end ? end : m_size) - begin;
+	inline Value Read(size_type begin, size_type len) const {
 		IBufStream bin{(const char *)m_bytes.get(), begin};
 		return ValueIO::Read(bin, len);
+	}
+	inline void CopyData(size_type begin, size_type len, char *dst) const {
+		auto src = (const char *)m_bytes.get();
+		std::copy(src + begin, src + begin + len, dst);
 	}
 	inline const byte *GetData() const { return m_bytes.get(); }
 };
@@ -134,29 +134,79 @@ public:
 	inline KVValueFile(std::filesystem::path file_path, size_type offset, size_type size)
 	    : m_file_path{std::move(file_path)}, m_offset{offset}, m_size{size} {}
 
+	inline const std::filesystem::path &GetFilePath() const { return m_file_path; }
 	inline size_type GetSize() const { return m_size; }
-	inline Value Read(size_type begin, size_type end = -1) const {
-		size_type len = ((~end) ? end : m_size) - begin;
+	inline Value Read(size_type begin, size_type len) const {
 		std::ifstream fin{m_file_path, std::ios::binary};
 		fin.seekg(m_offset + begin);
 		return ValueIO::Read(fin, len);
 	}
+	inline void CopyData(size_type begin, size_type len, char *dst) const {
+		std::ifstream fin{m_file_path, std::ios::binary};
+		fin.seekg(m_offset + begin);
+		fin.read(dst, len);
+	}
 };
 
-template <typename Key, typename Value, typename KeyTable, typename ValueTable> class KVTableIterator {
+template <typename Key, typename Value, typename Trait, typename Table> class KVTableIterator {
 private:
-	const KeyTable &m_key_table;
-	const ValueTable &m_value_table;
-	const KVKeyOffset<Key> *const m_key_offset;
+	const Table *m_p_table;
+	const KVKeyOffset<Key> *m_p_key_offset;
 
 public:
-	inline KVTableIterator(const KeyTable &key_table, const ValueTable &value_table, const KVKeyOffset<Key> *key_offset)
-	    : m_key_table{key_table}, m_value_table{value_table}, m_key_offset{key_offset} {}
-	inline bool IsDeleted() const { return m_key_offset->IsDeleted(); }
-	inline Value GetValue() const {
-		const KVKeyOffset<Key> *key_nxt = m_key_offset + 1;
-		return m_value_table.Read(m_key_offset->GetOffset(),
-		                          key_nxt == m_key_table.GetEnd() ? -1 : key_nxt->GetOffset());
+	inline KVTableIterator(const Table *p_table, const KVKeyOffset<Key> *p_key_offset)
+	    : m_p_table{p_table}, m_p_key_offset{p_key_offset} {}
+	inline time_type GetTimeStamp() const { return m_p_table->GetTimeStamp(); }
+	inline bool IsValid() const { return m_p_key_offset != m_p_table->m_keys.GetEnd(); }
+	inline bool IsKeyDeleted() const { return m_p_key_offset->IsDeleted(); }
+	inline Key GetKey() const { return m_p_key_offset->GetKey(); }
+	inline size_type GetValueSize() const {
+		const KVKeyOffset<Key> *p_nxt = m_p_key_offset + 1;
+		return (p_nxt == m_p_table->m_keys.GetEnd() ? m_p_table->m_values.GetSize() : p_nxt->GetOffset()) -
+		       m_p_key_offset->GetOffset();
+	}
+	inline Value ReadValue() const { return m_p_table->m_values.Read(m_p_key_offset->GetOffset(), GetValueSize()); }
+	inline void CopyValueData(char *dst) const {
+		m_p_table->m_values.CopyData(m_p_key_offset->GetOffset(), GetValueSize(), dst);
+	}
+	inline void Proceed() { ++m_p_key_offset; }
+};
+
+template <typename Iterator> class KVTableIteratorHeap;
+template <typename Key, typename Value, typename Trait, typename Table>
+class KVTableIteratorHeap<KVTableIterator<Key, Value, Trait, Table>> {
+private:
+	using Iterator = KVTableIterator<Key, Value, Trait, Table>;
+	using KeyCompare = typename Trait::Compare;
+	struct Compare {
+		inline bool operator()(const Iterator &l, const Iterator &r) const {
+			return KeyCompare{}(l.GetKey(), r.GetKey()) ||
+			       (!KeyCompare{}(r.GetKey(), l.GetKey()) && l.GetTimeStamp() > r.GetTimeStamp());
+		}
+	};
+	struct RevCompare {
+		inline bool operator()(const Iterator &l, const Iterator &r) const { return Compare{}(r, l); }
+	};
+	std::vector<Iterator> m_vec;
+
+public:
+	inline KVTableIteratorHeap() = default;
+	inline explicit KVTableIteratorHeap(std::vector<Iterator> &&vec) : m_vec{std::move(vec)} {
+		std::make_heap(m_vec.begin(), m_vec.end(), RevCompare{});
+	}
+	inline bool IsEmpty() const { return m_vec.empty(); }
+	inline Iterator GetTop() const { return m_vec.front(); }
+	inline Iterator Proceed() {
+		Iterator ret = m_vec.front();
+		do {
+			std::pop_heap(m_vec.begin(), m_vec.end(), RevCompare{});
+			m_vec.back().Proceed();
+			if (m_vec.back().IsValid())
+				std::push_heap(m_vec.begin(), m_vec.end(), RevCompare{});
+			else
+				m_vec.pop_back();
+		} while (!m_vec.empty() && !KeyCompare{}(ret.GetKey(), m_vec.front().GetKey()));
+		return ret;
 	}
 };
 
@@ -169,19 +219,29 @@ private:
 	ValueBuffer m_values;
 
 	template <typename, typename, typename> friend class KVFileTable;
+	template <typename, typename, typename, typename> friend class KVTableIterator;
 
 public:
-	using Iterator = KVTableIterator<Key, Value, KeyTable, ValueBuffer>;
+	using Iterator = KVTableIterator<Key, Value, Trait, KVBufferTable>;
 
 	inline KVBufferTable(KeyTable &&keys, ValueBuffer &&values)
 	    : m_keys{std::move(keys)}, m_values{std::move(values)} {}
 
 	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
+	inline Key GetMinKey() const { return m_keys.GetMin(); }
+	inline Key GetMaxKey() const { return m_keys.GetMax(); }
+	inline size_type GetKeyCount() const { return m_keys.GetCount(); }
 	inline std::optional<Iterator> Find(Key key) const {
 		const KVKeyOffset<Key> *key_it = m_keys.Find(key);
 		if (key_it == nullptr)
 			return std::nullopt;
-		return Iterator{m_keys, m_values, key_it};
+		return Iterator{this, key_it};
+	}
+	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
+
+	template <typename Table> inline bool IsOverlap(const Table &table) const {
+		using Compare = typename Trait::Compare;
+		return !(Compare{}(GetMaxKey(), table.GetMinKey()) || Compare{}(table.GetMaxKey(), GetMinKey()));
 	}
 };
 
@@ -193,8 +253,10 @@ private:
 	KeyTable m_keys;
 	ValueFile m_values;
 
+	template <typename, typename, typename, typename> friend class KVTableIterator;
+
 public:
-	using Iterator = KVTableIterator<Key, Value, KeyTable, ValueFile>;
+	using Iterator = KVTableIterator<Key, Value, Trait, KVFileTable>;
 
 	inline KVFileTable(const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer)
 	    : m_values{file_path, IO<KeyTable>::GetSize(buffer.m_keys), buffer.m_values.GetSize()} {
@@ -213,12 +275,20 @@ public:
 		m_values = ValueFile{file_path, value_offset, value_size};
 	}
 
+	inline const std::filesystem::path &GetFilePath() const { return m_values.GetFilePath(); }
 	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
-	inline std::optional<Iterator> Find(Key key) const {
+	inline Key GetMinKey() const { return m_keys.GetMin(); }
+	inline Key GetMaxKey() const { return m_keys.GetMax(); }
+	inline size_type GetKeyCount() const { return m_keys.GetCount(); }
+	inline Iterator Find(Key key) const {
 		const KVKeyOffset<Key> *key_it = m_keys.Find(key);
-		if (key_it == nullptr)
-			return std::nullopt;
-		return Iterator{m_keys, m_values, key_it};
+		return Iterator{this, key_it};
+	}
+	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
+
+	template <typename Table> inline bool IsOverlap(const Table &table) const {
+		using Compare = typename Trait::Compare;
+		return !(Compare{}(GetMaxKey(), table.GetMinKey()) || Compare{}(table.GetMaxKey(), GetMinKey()));
 	}
 };
 
