@@ -19,6 +19,7 @@ namespace lsm {
 
 template <typename Key, typename Value, typename Trait = KVDefaultTrait<Key, Value>> class KV {
 	static_assert(std::is_integral_v<Key>);
+
 private:
 	constexpr static level_type kLevels = Trait::kLevels;
 	constexpr static const KVLevelConfig *kLevelConfigs = Trait::kLevelConfigs;
@@ -31,7 +32,7 @@ private:
 
 	MemSkipList m_mem_skiplist;
 	std::vector<FileTable> m_levels[kLevels + 1];
-	time_type m_level_time_stamps[kLevels + 1];
+	time_type m_level_time_stamps[kLevels + 1]{};
 
 	inline std::filesystem::path get_level_dir(level_type level) const {
 		return m_directory / (std::string{"level-"} + std::to_string(level));
@@ -49,9 +50,9 @@ private:
 		}
 	}
 	inline void init_time_stamps() {
-		constexpr time_type kUnit = (std::numeric_limits<time_type>::max() - 1) / (kLevels + 1);
+		constexpr time_type kUnit = std::numeric_limits<time_type>::max() / (kLevels + 1);
 		for (level_type l = 0; l <= kLevels; ++l)
-			m_level_time_stamps[l] = kUnit * (kLevels - l) + 1;
+			m_level_time_stamps[l] = kUnit * (kLevels - l);
 	}
 	template <level_type Level>
 	std::list<std::filesystem::path> compaction(std::list<BufferTable> &&src_buffer_tables) {
