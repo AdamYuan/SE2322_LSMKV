@@ -16,7 +16,7 @@ struct KVLevelConfig {
 };
 template <typename Key, typename Value, typename CompareType = std::less<Key>> struct KVDefaultTrait {
 	using Compare = CompareType;
-	using SkipList = ::lsm::SkipList<Key, std::optional<Value>, std::default_random_engine, 1, 2, 64, Compare>;
+	using SkipList = ::lsm::SkipList<Key, std::optional<Value>, Compare, std::default_random_engine, 1, 2, 64>;
 	using Bloom = ::lsm::Bloom<Key, 10240 * 8>;
 	using ValueIO = IO<Value>;
 	constexpr static size_type kSingleFileSizeLimit = 2 * 1024 * 1024;

@@ -8,8 +8,9 @@
 
 namespace lsm {
 
-template <typename Key, typename Value, typename RandomGenerator = std::default_random_engine, //
-          uint32_t Prob = 1u, uint32_t ProbDiv = 2u, uint32_t MaxLevel = 64, typename Compare = std::less<Key>>
+template <typename Key, typename Value, typename Compare = std::less<Key>,
+          typename RandomGenerator = std::default_random_engine, uint32_t Prob = 1u, uint32_t ProbDiv = 2u,
+          uint32_t MaxLevel = 64>
 class SkipList {
 private:
 	RandomGenerator m_rand_gen;
