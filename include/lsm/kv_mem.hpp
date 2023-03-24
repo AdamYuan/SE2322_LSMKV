@@ -89,6 +89,9 @@ public:
 		m_skiplist.Insert(key, std::nullopt);
 		return {std::move(ret)};
 	}
+	template <typename Func> inline void Scan(Key min_key, Key max_key, Func &&func) const {
+		m_skiplist.Scan(min_key, max_key, std::forward<Func>(func));
+	}
 	inline std::optional<std::optional<Value>> Get(Key key) const { return m_skiplist.Search(key); }
 	inline bool IsEmpty() const { return m_skiplist.IsEmpty(); }
 };

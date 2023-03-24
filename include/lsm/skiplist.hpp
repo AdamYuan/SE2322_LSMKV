@@ -62,6 +62,15 @@ private:
 			func(node->key, node->value);
 	}
 
+	template <typename Func> inline void scan_impl(const Key &min_key, const Key &max_key, Func &&func) const {
+		const Block *blk = &m_head;
+		for (level_type l = m_level - 1; ~l; --l)
+			while (forward_key_less(blk, l, min_key))
+				blk = &blk->forward[l]->blk;
+		for (const Node *node = blk->forward[0]; node && !Compare{}(max_key, node->key); node = node->blk.forward[0])
+			func(node->key, node->value);
+	}
+
 	inline const Node *search_impl(const Key &key) const {
 		const Block *blk = &m_head;
 		for (level_type l = m_level - 1; ~l; --l)
@@ -162,6 +171,9 @@ public:
 	inline bool IsEmpty() const { return m_size == 0; }
 	inline level_type GetLevel() const { return m_level; }
 	template <typename Func> inline void ForEach(Func &&func) const { for_each_impl(std::forward<Func>(func)); }
+	template <typename Func> inline void Scan(const Key &min_key, const Key &max_key, Func &&func) const {
+		scan_impl(min_key, max_key, std::forward<Func>(func));
+	}
 };
 
 } // namespace lsm

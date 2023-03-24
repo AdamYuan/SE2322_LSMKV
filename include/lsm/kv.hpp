@@ -20,6 +20,7 @@ private:
 	using FileTable = KVFileTable<Key, Value, Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
 	using MemSkipList = KVMemSkipList<Key, Value, Trait>;
+	using Compare = typename Trait::Compare;
 
 	std::filesystem::path m_directory;
 
@@ -125,10 +126,10 @@ private:
 		buffer_tables.push_back(std::move(buffer_table));
 		compaction<0>(std::move(buffer_tables));
 		/* for (auto &level_vec : m_levels)
-			if (!std::is_sorted(level_vec.begin(), level_vec.end(),
-			                    [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); })) {
-				printf("Not Sorted\n");
-			}*/
+		    if (!std::is_sorted(level_vec.begin(), level_vec.end(),
+		                        [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); })) {
+		        printf("Not Sorted\n");
+		    }*/
 	}
 
 public:
@@ -190,6 +191,36 @@ public:
 			}
 		}
 		return std::nullopt;
+	}
+
+	template <typename Func> inline void Scan(Key min_key, Key max_key, Func &&func) const {
+		KVTableIteratorHeap<typename FileTable::Iterator> iterator_heap;
+		{
+			std::vector<typename FileTable::Iterator> iterators;
+			for (const auto &level_vec : m_levels)
+				for (const FileTable &table : level_vec)
+					if (table.IsOverlap(min_key, max_key))
+						iterators.push_back(table.GetLowerBound(min_key));
+			iterator_heap = KVTableIteratorHeap<typename FileTable::Iterator>{std::move(iterators)};
+		}
+		m_mem_skiplist.Scan(min_key, max_key, [&iterator_heap, &func](Key key, const std::optional<Value> &opt_value) {
+			while (!iterator_heap.IsEmpty() && Compare{}(iterator_heap.GetTop().GetKey(), key)) {
+				const auto &it = iterator_heap.GetTop();
+				if (!it.IsKeyDeleted())
+					func(it.GetKey(), it.ReadValue());
+				iterator_heap.Proceed();
+			}
+			if (!iterator_heap.IsEmpty() && !Compare{}(key, iterator_heap.GetTop().GetKey()))
+				iterator_heap.Proceed();
+			if (opt_value.has_value())
+				func(key, opt_value.value());
+		});
+		while (!iterator_heap.IsEmpty() && !Compare{}(max_key, iterator_heap.GetTop().GetKey())) {
+			const auto &it = iterator_heap.GetTop();
+			if (!it.IsKeyDeleted())
+				func(it.GetKey(), it.ReadValue());
+			iterator_heap.Proceed();
+		}
 	}
 
 	inline bool Delete(Key key) {

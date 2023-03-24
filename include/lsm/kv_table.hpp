@@ -57,9 +57,7 @@ public:
 	}
 	inline const KeyOffset *GetBegin() const { return m_keys.get(); }
 	inline const KeyOffset *GetEnd() const { return m_keys.get() + m_count; }
-	inline const KeyOffset *Find(Key key) const {
-		if (IsExcluded(key))
-			return GetEnd();
+	inline const KeyOffset *GetLowerBound(Key key) const {
 		const KeyOffset *first = GetBegin(), *key_it;
 		size_type count = m_count, step;
 		while (count > 0) {
@@ -71,6 +69,12 @@ public:
 			} else
 				count = step;
 		}
+		return key_it;
+	}
+	inline const KeyOffset *Find(Key key) const {
+		if (IsExcluded(key))
+			return GetEnd();
+		const KeyOffset *key_it = GetLowerBound(key);
 		return Compare{}(key_it->GetKey(), key) || Compare{}(key, key_it->GetKey()) ? GetEnd() : key_it;
 	}
 };
@@ -240,6 +244,7 @@ public:
 		return Iterator{this, key_it};
 	}
 	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
+	inline Iterator GetLowerBound(Key key) const { return Iterator{this, m_keys.GetLowerBound(key)}; }
 
 	inline bool IsOverlap(Key min_key, Key max_key) const {
 		using Compare = typename Trait::Compare;
@@ -290,6 +295,7 @@ public:
 		return Iterator{this, key_it};
 	}
 	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
+	inline Iterator GetLowerBound(Key key) const { return Iterator{this, m_keys.GetLowerBound(key)}; }
 
 	inline bool IsOverlap(Key min_key, Key max_key) const {
 		using Compare = typename Trait::Compare;
