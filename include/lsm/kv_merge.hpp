@@ -4,7 +4,7 @@
 #include "kv_table.hpp"
 
 #include <algorithm>
-#include <list>
+#include <vector>
 
 namespace lsm {
 
@@ -17,12 +17,14 @@ private:
 
 	time_type m_time_stamp;
 
+	std::vector<FileTable> m_file_tables;
+	std::vector<BufferTable> m_buffer_tables;
 	KVTableIteratorHeap<typename FileTable::Iterator> m_file_it_heap;
 	KVTableIteratorHeap<typename BufferTable ::Iterator> m_buffer_it_heap;
 
 	KVMemAppender<Key, Value, Trait> m_mem_appender;
 
-	std::list<BufferTable> m_result_tables;
+	std::vector<BufferTable> m_result_tables;
 
 	template <bool Delete, typename Iterator> inline void push_iterator(const Iterator &it) {
 		std::optional<BufferTable> opt_buffer = m_mem_appender.template Append<Delete>(it, m_time_stamp);
@@ -33,21 +35,25 @@ private:
 	}
 
 public:
-	inline KVMerger(std::list<FileTable> &&file_tables, std::list<BufferTable> &&buffer_tables, time_type time_stamp)
-	    : m_time_stamp{time_stamp} {
+	inline KVMerger(std::vector<FileTable> &&file_tables, std::vector<BufferTable> &&buffer_tables,
+	                time_type time_stamp)
+	    : m_time_stamp{time_stamp}, m_file_tables{std::move(file_tables)}, m_buffer_tables{std::move(buffer_tables)} {
+
+		m_result_tables.reserve(m_file_tables.size() + m_buffer_tables.size());
+
 		std::vector<typename FileTable::Iterator> file_it_vec;
 		file_it_vec.reserve(file_it_vec.size());
-		for (const auto &table : file_tables)
+		for (const auto &table : m_file_tables)
 			file_it_vec.push_back(table.GetBegin());
 		m_file_it_heap = KVTableIteratorHeap<typename FileTable::Iterator>{std::move(file_it_vec)};
 
 		std::vector<typename BufferTable::Iterator> buffer_it_vec;
 		buffer_it_vec.reserve(buffer_it_vec.size());
-		for (const auto &table : buffer_tables)
+		for (const auto &table : m_buffer_tables)
 			buffer_it_vec.push_back(table.GetBegin());
 		m_buffer_it_heap = KVTableIteratorHeap<typename BufferTable::Iterator>{std::move(buffer_it_vec)};
 	}
-	template <bool Delete> inline std::list<BufferTable> Run() {
+	template <bool Delete> inline std::vector<BufferTable> Run() {
 		while (!m_file_it_heap.IsEmpty() && !m_buffer_it_heap.IsEmpty()) {
 			auto file_it = m_file_it_heap.GetTop();
 			auto buffer_it = m_buffer_it_heap.GetTop();

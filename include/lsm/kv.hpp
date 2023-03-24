@@ -1,13 +1,6 @@
 #pragma once
 
-#include <cinttypes>
 #include <filesystem>
-#include <fstream>
-#include <list>
-#include <memory>
-#include <optional>
-#include <string>
-#include <string_view>
 #include <type_traits>
 
 #include "kv_mem.hpp"
@@ -54,35 +47,36 @@ private:
 		for (level_type l = 0; l <= kLevels; ++l)
 			m_level_time_stamps[l] = kUnit * (kLevels - l);
 	}
-	template <level_type Level>
-	std::list<std::filesystem::path> compaction(std::list<BufferTable> &&src_buffer_tables) {
+	template <level_type Level> void compaction(std::vector<BufferTable> &&src_buffer_tables) {
 		auto &level_vec = m_levels[Level];
 
 		if constexpr (Level == kLevels) {
 			for (auto &buffer_table : src_buffer_tables)
 				level_vec.push_back(
 				    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
-			return {};
+			return;
 		} else {
 			if (level_vec.size() + src_buffer_tables.size() <= kLevelConfigs[Level].max_files) {
 				for (auto &buffer_table : src_buffer_tables)
 					level_vec.push_back(
 					    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
-				return {};
+				return;
 			}
 
-			std::list<FileTable> src_file_tables;
+			std::vector<FileTable> src_file_tables;
 			if constexpr (kLevelConfigs[Level].type == KVLevelType::kTiering) {
 				for (auto &table : level_vec)
 					src_file_tables.push_back(std::move(table));
 				level_vec.clear();
 			} else { // Leveling
-				while (level_vec.size() < kLevelConfigs[Level].max_files) {
-					auto &buffer_table = src_buffer_tables.front();
+				auto src_buffer_crop_it = src_buffer_tables.end() - (kLevelConfigs[Level].max_files - level_vec.size());
+				for (auto it = src_buffer_crop_it; it != src_buffer_tables.end(); ++it) {
+					auto &buffer_table = *it;
 					level_vec.push_back(
 					    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
-					src_buffer_tables.pop_front();
 				}
+				src_buffer_tables.erase(src_buffer_crop_it, src_buffer_tables.end());
+
 				while (level_vec.size() > kLevelConfigs[Level].max_files) {
 					auto &table = level_vec.back();
 					src_file_tables.push_back(std::move(table));
@@ -91,26 +85,27 @@ private:
 			}
 			// Find Overlapped Tables in Next Level
 			if constexpr (Level + 1 == kLevels || kLevelConfigs[Level + 1].type == KVLevelType::kLeveling) {
-				std::list<FileTable> next_src_file_tables;
+				size_type src_file_table_size = src_file_tables.size();
 				auto &next_level_vec = m_levels[Level + 1];
 				next_level_vec.erase(
-				    std::remove_if(
-				        next_level_vec.begin(), next_level_vec.end(),
-				        [this, &src_file_tables, &src_buffer_tables, &next_src_file_tables](auto &table) {
-					        const auto check_overlap = [&table](const auto &src_table) {
-						        return table.IsOverlap(src_table);
-					        };
-					        if (std::none_of(src_file_tables.begin(), src_file_tables.end(), check_overlap) &&
-					            std::none_of(src_buffer_tables.begin(), src_buffer_tables.end(), check_overlap))
-						        return false;
-					        next_src_file_tables.push_back(std::move(table));
-					        return true;
-				        }),
+				    std::remove_if(next_level_vec.begin(), next_level_vec.end(),
+				                   [this, &src_file_tables, &src_buffer_tables, src_file_table_size](auto &table) {
+					                   const auto check_overlap = [&table](const auto &src_table) {
+						                   return table.IsOverlap(src_table);
+					                   };
+					                   if (std::none_of(src_file_tables.begin(),
+					                                    src_file_tables.begin() + src_file_table_size, check_overlap) &&
+					                       std::none_of(src_buffer_tables.begin(), src_buffer_tables.end(),
+					                                    check_overlap))
+						                   return false;
+					                   src_file_tables.push_back(std::move(table));
+					                   return true;
+				                   }),
 				    next_level_vec.end());
-				src_file_tables.splice(src_file_tables.end(), std::move(next_src_file_tables));
 			}
 
-			std::list<std::filesystem::path> deleted_file_paths;
+			std::vector<std::filesystem::path> deleted_file_paths;
+			deleted_file_paths.reserve(src_file_tables.size());
 			for (const auto &table : src_file_tables)
 				deleted_file_paths.push_back(table.GetFilePath());
 
@@ -119,17 +114,21 @@ private:
 			auto dst_buffer_tables = merger.template Run<Level + 1 == kLevels>();
 			m_level_time_stamps[Level + 1] += dst_buffer_tables.size();
 
-			deleted_file_paths.splice(deleted_file_paths.end(), compaction<Level + 1>(std::move(dst_buffer_tables)));
-			return deleted_file_paths;
+			compaction<Level + 1>(std::move(dst_buffer_tables));
+
+			for (const auto &file_path : deleted_file_paths)
+				std::filesystem::remove(file_path);
 		}
 	}
 	inline void store_buffer_table(BufferTable &&buffer_table) {
-		std::list<BufferTable> buffer_tables;
+		std::vector<BufferTable> buffer_tables;
 		buffer_tables.push_back(std::move(buffer_table));
-		auto deleted_file_paths = compaction<0>(std::move(buffer_tables));
-
-		for (const auto &file_path : deleted_file_paths)
-			std::filesystem::remove(file_path);
+		compaction<0>(std::move(buffer_tables));
+		/* for (auto &level_vec : m_levels)
+			if (!std::is_sorted(level_vec.begin(), level_vec.end(),
+			                    [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); })) {
+				printf("Not Sorted\n");
+			}*/
 	}
 
 public:

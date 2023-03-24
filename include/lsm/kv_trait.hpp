@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "bloom.hpp"
 #include "io.hpp"
 #include "skiplist.hpp"
