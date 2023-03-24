@@ -110,9 +110,10 @@ private:
 			for (const auto &table : src_file_tables)
 				deleted_file_paths.push_back(table.GetFilePath());
 
-			KVMerger<Key, Value, Trait> merger{std::move(src_file_tables), std::move(src_buffer_tables),
-			                                   m_level_time_stamps[Level + 1]};
-			auto dst_buffer_tables = merger.template Run<Level + 1 == kLevels>();
+			std::vector<BufferTable> dst_buffer_tables =
+			    KVMerger<Key, Value, Trait>{std::move(src_file_tables), std::move(src_buffer_tables),
+			                                m_level_time_stamps[Level + 1]}
+			        .template Run<Level + 1 == kLevels>();
 			m_level_time_stamps[Level + 1] += dst_buffer_tables.size();
 
 			compaction<Level + 1>(std::move(dst_buffer_tables));
@@ -252,13 +253,11 @@ public:
 
 	inline void Reset() {
 		m_mem_skiplist.Reset();
-
-		for (level_type level = 0; level <= kLevels; ++level)
-			m_levels[level].clear();
+		for (auto &level_vec : m_levels)
+			level_vec.clear();
 
 		if (std::filesystem::exists(m_directory))
 			std::filesystem::remove_all(m_directory);
-
 		init_directory();
 		init_time_stamps();
 	}
