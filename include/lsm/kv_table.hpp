@@ -95,7 +95,7 @@ template <typename Key, typename Trait> struct IO<KVKeyTable<Key, Trait>> {
 		table.m_min = IO<Key>::Read(istr);
 		table.m_max = IO<Key>::Read(istr);
 		table.m_bloom = IO<typename Trait::Bloom>::Read(istr);
-		table.m_keys = std::make_unique<KVKeyOffset<Key>[]>(table.m_count);
+		table.m_keys = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[table.m_count]);
 		istr.read((char *)table.m_keys.get(), table.m_count * sizeof(KVKeyOffset<Key>));
 		return table;
 	}

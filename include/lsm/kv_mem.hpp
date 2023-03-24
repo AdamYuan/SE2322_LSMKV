@@ -26,10 +26,10 @@ public:
 		m_sorted_table_size = kInitialFileSize;
 	}
 	inline Buffer PopBuffer(time_type time_stamp) {
-		auto key_buffer = std::make_unique<KVKeyOffset<Key>[]>(m_skiplist.GetSize());
+		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_skiplist.GetSize()]);
 
 		size_type value_size = m_sorted_table_size - kInitialFileSize - m_skiplist.GetSize() * sizeof(KeyOffset);
-		auto value_buffer = std::make_unique<byte[]>(value_size);
+		auto value_buffer = std::unique_ptr<byte[]>(new byte[value_size]);
 		OBufStream value_stream{(char *)value_buffer.get()};
 
 		size_type key_id = 0;
@@ -114,9 +114,9 @@ public:
 		m_value_buffer.clear();
 	}
 	inline BufferTable PopBuffer(time_type time_stamp) {
-		auto key_buffer = std::make_unique<KeyOffset[]>(m_key_offset_vec.size());
+		auto key_buffer = std::unique_ptr<KeyOffset[]>(new KeyOffset[m_key_offset_vec.size()]);
 		std::copy(m_key_offset_vec.begin(), m_key_offset_vec.end(), key_buffer.get());
-		auto value_buffer = std::make_unique<byte[]>(m_value_buffer.size());
+		auto value_buffer = std::unique_ptr<byte[]>(new byte[m_value_buffer.size()]);
 		std::copy(m_value_buffer.begin(), m_value_buffer.end(), value_buffer.get());
 		return BufferTable{
 		    KVKeyTable<Key, Trait>{time_stamp, std::move(key_buffer), (size_type)m_key_offset_vec.size()},
