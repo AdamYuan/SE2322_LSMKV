@@ -241,9 +241,12 @@ public:
 	}
 	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
 
-	template <typename Table> inline bool IsOverlap(const Table &table) const {
+	inline bool IsOverlap(Key min_key, Key max_key) const {
 		using Compare = typename Trait::Compare;
-		return !(Compare{}(GetMaxKey(), table.GetMinKey()) || Compare{}(table.GetMaxKey(), GetMinKey()));
+		return !(Compare{}(GetMaxKey(), min_key) || Compare{}(max_key, GetMinKey()));
+	}
+	template <typename Table> inline bool IsOverlap(const Table &table) const {
+		return IsOverlap(table.GetMinKey(), table.GetMaxKey());
 	}
 };
 
@@ -288,9 +291,12 @@ public:
 	}
 	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
 
-	template <typename Table> inline bool IsOverlap(const Table &table) const {
+	inline bool IsOverlap(Key min_key, Key max_key) const {
 		using Compare = typename Trait::Compare;
-		return !(Compare{}(GetMaxKey(), table.GetMinKey()) || Compare{}(table.GetMaxKey(), GetMinKey()));
+		return !(Compare{}(GetMaxKey(), min_key) || Compare{}(max_key, GetMinKey()));
+	}
+	template <typename Table> inline bool IsOverlap(const Table &table) const {
+		return IsOverlap(table.GetMinKey(), table.GetMaxKey());
 	}
 };
 
