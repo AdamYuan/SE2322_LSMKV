@@ -131,25 +131,22 @@ template <typename Value, typename Trait> class KVValueFile {
 private:
 	using ValueIO = typename Trait::ValueIO;
 
-	std::filesystem::path m_file_path;
+	mutable std::ifstream m_file_stream;
 	size_type m_offset{}, m_size{};
 
 public:
 	inline KVValueFile() = default;
-	inline KVValueFile(std::filesystem::path file_path, size_type offset, size_type size)
-	    : m_file_path{std::move(file_path)}, m_offset{offset}, m_size{size} {}
+	inline KVValueFile(std::ifstream &&file_stream, size_type offset, size_type size)
+	    : m_file_stream{std::move(file_stream)}, m_offset{offset}, m_size{size} {}
 
-	inline const std::filesystem::path &GetFilePath() const { return m_file_path; }
 	inline size_type GetSize() const { return m_size; }
 	inline Value Read(size_type begin, size_type len) const {
-		std::ifstream fin{m_file_path, std::ios::binary};
-		fin.seekg(m_offset + begin);
-		return ValueIO::Read(fin, len);
+		m_file_stream.seekg(m_offset + begin);
+		return ValueIO::Read(m_file_stream, len);
 	}
 	inline void CopyData(size_type begin, size_type len, char *dst) const {
-		std::ifstream fin{m_file_path, std::ios::binary};
-		fin.seekg(m_offset + begin);
-		fin.read(dst, len);
+		m_file_stream.seekg(m_offset + begin);
+		m_file_stream.read(dst, len);
 	}
 };
 
@@ -263,29 +260,33 @@ private:
 	KeyTable m_keys;
 	ValueFile m_values;
 
+	std::filesystem::path m_file_path;
+
 	template <typename, typename, typename, typename> friend class KVTableIterator;
 
 public:
 	using Iterator = KVTableIterator<Key, Value, Trait, KVFileTable>;
 
 	inline KVFileTable(const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer)
-	    : m_values{file_path, IO<KeyTable>::GetSize(buffer.m_keys), buffer.m_values.GetSize()} {
+	    : m_file_path{file_path} {
 		m_keys = std::move(buffer.m_keys);
-		std::ofstream fout{file_path, std::ios::binary};
-		IO<KeyTable>::Write(fout, m_keys);
-		fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
-	}
-	inline explicit KVFileTable(const std::filesystem::path &file_path) {
 		{
-			std::ifstream fin{file_path, std::ios::binary};
-			m_keys = IO<KeyTable>::Read(fin);
+			std::ofstream fout{file_path, std::ios::binary};
+			IO<KeyTable>::Write(fout, m_keys);
+			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
 		}
+		m_values = ValueFile{std::ifstream{file_path, std::ios::binary}, IO<KeyTable>::GetSize(buffer.m_keys),
+		                     buffer.m_values.GetSize()};
+	}
+	inline explicit KVFileTable(const std::filesystem::path &file_path) : m_file_path{file_path} {
+		std::ifstream fin{file_path, std::ios::binary};
+		m_keys = IO<KeyTable>::Read(fin);
 		size_type value_offset = IO<KeyTable>::GetSize(m_keys);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
-		m_values = ValueFile{file_path, value_offset, value_size};
+		m_values = ValueFile{std::move(fin), value_offset, value_size};
 	}
 
-	inline const std::filesystem::path &GetFilePath() const { return m_values.GetFilePath(); }
+	inline const std::filesystem::path &GetFilePath() const { return m_file_path; }
 	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
 	inline Key GetMinKey() const { return m_keys.GetMin(); }
 	inline Key GetMaxKey() const { return m_keys.GetMax(); }

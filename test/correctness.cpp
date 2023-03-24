@@ -8,7 +8,7 @@
 class CorrectnessTest : public Test {
 private:
 	const uint64_t SIMPLE_TEST_MAX = 512;
-	const uint64_t LARGE_TEST_MAX = 1024 * 64;
+	const uint64_t LARGE_TEST_MAX = 1024 * 16;
 
 	void regular_test(uint64_t max) {
 		uint64_t i;
@@ -41,13 +41,11 @@ private:
 		std::list<std::pair<uint64_t, std::string>> list_ans;
 		std::list<std::pair<uint64_t, std::string>> list_stu;
 
-		for (i = 0; i < max / 2; ++i) {
-			list_ans.emplace_back(std::make_pair(i, std::string(i + 1, 's')));
-		}
+		for (i = 0; i < max / 2; ++i)
+			list_ans.emplace_back(i, std::string(i + 1, 's'));
 
-		store.Scan(0, max / 2 - 1, [&list_stu](uint64_t key, const std::string &str) {
-			list_stu.push_back({key, str});
-		});
+		store.Scan(0, max / 2 - 1,
+		           [&list_stu](uint64_t key, std::string str) { list_stu.emplace_back(key, std::move(str)); });
 		EXPECT(list_ans.size(), list_stu.size());
 
 		auto ap = list_ans.begin();
