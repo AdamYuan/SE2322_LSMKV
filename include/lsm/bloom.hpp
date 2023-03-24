@@ -1,6 +1,5 @@
 #pragma once
 
-#include <bitset>
 #include <functional>
 #include <random>
 
@@ -39,41 +38,29 @@ struct BloomDefaultHasher {
 
 template <typename Key, size_type Bits, typename Hasher = BloomDefaultHasher<Key, 3>> class Bloom {
 private:
-	std::bitset<Bits> m_bits;
+	static constexpr size_type kU64Count = (Bits >> 6u) + ((Bits & 63u) ? 1 : 0);
+	uint64_t m_bits[kU64Count]{};
+
+	class Wrapper {
+	private:
+		uint64_t &m_target;
+		size_type m_offset;
+
+	public:
+		Wrapper(uint64_t &target, size_type offset) : m_target{target}, m_offset{offset} {}
+		inline Wrapper &operator=(bool b) {
+			m_target |= b ? (1ULL << m_offset) : 0;
+			return *this;
+		}
+	};
 
 public:
-	inline static constexpr size_type GetBits() { return Bits; }
+	inline bool operator[](size_type idx) const { return m_bits[idx >> 6u] & (1ULL << (idx & 63ULL)); }
+	inline Wrapper operator[](size_type idx) { return {m_bits[idx >> 6u], idx & 63u}; }
 
 	inline Bloom() = default;
-	inline void Insert(const Key &key) { Hasher::template Insert<Bits>(m_bits, key); }
-	inline bool Exist(const Key &key) const { return Hasher::template Exist<Bits>(m_bits, key); }
-	inline std::bitset<Bits> &GetBitset() { return m_bits; }
-	inline const std::bitset<Bits> &GetBitset() const { return m_bits; }
-	inline void Clear() { m_bits.reset(); }
-};
-
-template <typename Key, size_type Bits, typename Hasher> struct IO<Bloom<Key, Bits, Hasher>> {
-private:
-	inline static constexpr size_type get_u64s() { return (Bits >> 6u) + ((Bits & 63u) ? 1 : 0); }
-
-public:
-	inline static constexpr size_type GetSize(const Bloom<Key, Bits, Hasher> &) {
-		return get_u64s() << 3u; // times 8
-	}
-	template <typename Stream> inline static void Write(Stream &ostr, const Bloom<Key, Bits, Hasher> &bloom) {
-		for (size_type i = 0; i < get_u64s(); ++i) {
-			uint64_t u64 = ((bloom.GetBitset() >> (i << 6u)) & std::bitset<Bits>(0xffffffffffffffffULL)).to_ullong();
-			IO<uint64_t>::Write(ostr, u64);
-		}
-	}
-	template <typename Stream> inline static Bloom<Key, Bits, Hasher> Read(Stream &istr, size_type = 0) {
-		Bloom<Key, Bits, Hasher> bloom{};
-		for (size_type i = 0; i < get_u64s(); ++i) {
-			uint64_t u64 = IO<uint64_t>::Read(istr);
-			bloom.GetBitset() |= (std::bitset<Bits>(u64) << (i << 6u));
-		}
-		return bloom;
-	}
+	inline void Insert(const Key &key) { Hasher::template Insert<Bits>(*this, key); }
+	inline bool Exist(const Key &key) const { return Hasher::template Exist<Bits>(*this, key); }
 };
 
 } // namespace lsm
