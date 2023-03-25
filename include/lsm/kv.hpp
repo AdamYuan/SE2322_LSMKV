@@ -28,6 +28,8 @@ private:
 	std::vector<FileTable> m_levels[kLevels + 1];
 	time_type m_level_time_stamps[kLevels + 1]{};
 
+	LRUCache<time_type, std::ifstream> m_stream_cache;
+
 	inline std::filesystem::path get_level_dir(level_type level) const {
 		return m_directory / (std::string{"level-"} + std::to_string(level));
 	}
@@ -53,14 +55,14 @@ private:
 
 		if constexpr (Level == kLevels) {
 			for (auto &buffer_table : src_buffer_tables)
-				level_vec.push_back(
-				    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
+				level_vec.push_back(FileTable{&m_stream_cache, get_file_path(buffer_table.GetTimeStamp(), Level),
+				                              std::move(buffer_table)});
 			return;
 		} else {
 			if (level_vec.size() + src_buffer_tables.size() <= kLevelConfigs[Level].max_files) {
 				for (auto &buffer_table : src_buffer_tables)
-					level_vec.push_back(
-					    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
+					level_vec.push_back(FileTable{&m_stream_cache, get_file_path(buffer_table.GetTimeStamp(), Level),
+					                              std::move(buffer_table)});
 				return;
 			}
 
@@ -73,8 +75,8 @@ private:
 				auto src_buffer_crop_it = src_buffer_tables.end() - (kLevelConfigs[Level].max_files - level_vec.size());
 				for (auto it = src_buffer_crop_it; it != src_buffer_tables.end(); ++it) {
 					auto &buffer_table = *it;
-					level_vec.push_back(
-					    FileTable{get_file_path(buffer_table.GetTimeStamp(), Level), std::move(buffer_table)});
+					level_vec.push_back(FileTable{&m_stream_cache, get_file_path(buffer_table.GetTimeStamp(), Level),
+					                              std::move(buffer_table)});
 				}
 				src_buffer_tables.erase(src_buffer_crop_it, src_buffer_tables.end());
 
@@ -134,7 +136,8 @@ private:
 	}
 
 public:
-	inline explicit KV(std::string_view directory) : m_directory{directory} {
+	inline explicit KV(std::string_view directory, size_type stream_capacity = 64)
+	    : m_directory{directory}, m_stream_cache{stream_capacity} {
 		init_time_stamps();
 		init_directory();
 		for (const auto &level_dir : std::filesystem::directory_iterator(m_directory)) {
@@ -150,7 +153,7 @@ public:
 						continue;
 					if (!file.path().has_extension() || file.path().extension() != ".sst")
 						continue;
-					auto file_table = FileTable{file.path()};
+					auto file_table = FileTable{&m_stream_cache, file.path()};
 					m_level_time_stamps[level] = std::max(m_level_time_stamps[level], file_table.GetTimeStamp() + 1);
 					m_levels[level].push_back(std::move(file_table));
 				}
@@ -163,7 +166,8 @@ public:
 
 	inline ~KV() {
 		if (!m_mem_skiplist.IsEmpty())
-			FileTable{get_file_path(m_level_time_stamps[0], 0), m_mem_skiplist.PopBuffer(m_level_time_stamps[0])};
+			FileTable{nullptr, get_file_path(m_level_time_stamps[0], 0),
+			          m_mem_skiplist.PopBuffer(m_level_time_stamps[0])};
 	}
 
 	inline void Put(Key key, Value &&value) {

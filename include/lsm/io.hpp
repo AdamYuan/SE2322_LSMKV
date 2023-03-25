@@ -1,8 +1,10 @@
 #pragma once
 
+#include <fstream>
 #include <memory>
 #include <streambuf>
 #include <string>
+#include <unordered_map>
 
 #include "type.hpp"
 
@@ -49,6 +51,13 @@ template <> struct IO<std::string> {
 		istr.read(str.data(), length);
 		return str;
 	}
+};
+
+template <typename Key> class IFStreamCache {
+private:
+	std::unordered_map<Key, size_type> m_lookup_map;
+
+public:
 };
 
 } // namespace lsm
