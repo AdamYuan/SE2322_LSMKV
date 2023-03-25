@@ -106,24 +106,37 @@ private:
 	    sizeof(time_type) + sizeof(size_type) + sizeof(Key) * 2 + IO<typename Trait::Bloom>::GetSize({});
 
 	std::vector<KeyOffset> m_key_offset_vec;
-	std::vector<byte> m_value_buffer;
+	std::unique_ptr<byte[]> m_value_buffer;
+	size_type m_value_buffer_size{}, m_value_buffer_cap{};
+
 	size_type m_file_size{kInitialFileSize};
 
+	inline void reset_value_buffer() {
+		m_value_buffer_size = 0;
+		m_value_buffer_cap = kMaxFileSize - kInitialFileSize;
+		m_value_buffer = std::unique_ptr<byte[]>(new byte[kMaxFileSize - kInitialFileSize]);
+	}
+	inline void ensure_value_buffer_cap(size_type size) {
+		if (size <= m_value_buffer_cap)
+			return;
+		auto new_buffer = std::unique_ptr<byte[]>(new byte[size]);
+		std::copy(m_value_buffer.get(), m_value_buffer.get() + m_value_buffer_size, new_buffer.get());
+		m_value_buffer = std::move(new_buffer);
+	}
+
 public:
-	inline KVMemAppender() { m_value_buffer.reserve(kMaxFileSize); }
+	inline KVMemAppender() { reset_value_buffer(); }
 	inline void Reset() {
 		m_file_size = kInitialFileSize;
 		m_key_offset_vec.clear();
-		m_value_buffer.clear();
+		reset_value_buffer();
 	}
 	inline BufferTable PopBuffer(time_type time_stamp) {
 		auto key_buffer = std::unique_ptr<KeyOffset[]>(new KeyOffset[m_key_offset_vec.size()]);
 		std::copy(m_key_offset_vec.begin(), m_key_offset_vec.end(), key_buffer.get());
-		auto value_buffer = std::unique_ptr<byte[]>(new byte[m_value_buffer.size()]);
-		std::copy(m_value_buffer.begin(), m_value_buffer.end(), value_buffer.get());
 		return BufferTable{
 		    KVKeyBuffer<Key, Trait>{time_stamp, std::move(key_buffer), (size_type)m_key_offset_vec.size()},
-		    KVValueBuffer<Value, Trait>{std::move(value_buffer), (size_type)m_value_buffer.size()}};
+		    KVValueBuffer<Value, Trait>{std::move(m_value_buffer), m_value_buffer_size}};
 	}
 	template <bool Delete, typename Iterator>
 	inline std::optional<BufferTable> Append(const Iterator &it, time_type time_stamp) {
@@ -135,21 +148,22 @@ public:
 		size_type new_size = m_file_size + sizeof(KeyOffset) + value_size;
 		if (m_file_size == kInitialFileSize || new_size <= kMaxFileSize) {
 			m_file_size = new_size;
-			m_key_offset_vec.emplace_back(it.GetKey(), m_value_buffer.size(), it.IsKeyDeleted());
+			m_key_offset_vec.emplace_back(it.GetKey(), m_value_buffer_size, it.IsKeyDeleted());
 			if (value_size) {
-				size_type prev_size = m_value_buffer.size();
-				m_value_buffer.resize(prev_size + value_size);
-				it.CopyValueData((char *)m_value_buffer.data() + prev_size);
+				ensure_value_buffer_cap(m_value_buffer_size + value_size);
+				it.CopyValueData((char *)m_value_buffer.get() + m_value_buffer_size);
+				m_value_buffer_size += value_size;
 			}
 			return std::nullopt;
 		}
 		auto ret = PopBuffer(time_stamp);
 		Reset();
 		m_file_size += sizeof(KeyOffset) + value_size;
-		m_key_offset_vec.emplace_back(it.GetKey(), m_value_buffer.size(), it.IsKeyDeleted());
+		m_key_offset_vec.emplace_back(it.GetKey(), m_value_buffer_size, it.IsKeyDeleted());
 		if (value_size) {
-			m_value_buffer.resize(value_size);
-			it.CopyValueData((char *)m_value_buffer.data());
+			ensure_value_buffer_cap(value_size);
+			it.CopyValueData((char *)m_value_buffer.get());
+			m_value_buffer_size = value_size;
 		}
 		return {std::move(ret)};
 	}
