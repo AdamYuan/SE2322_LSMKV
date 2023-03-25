@@ -136,7 +136,7 @@ private:
 	}
 
 public:
-	inline explicit KV(std::string_view directory, size_type stream_capacity = 64)
+	inline explicit KV(std::string_view directory, size_type stream_capacity = 32)
 	    : m_directory{directory}, m_stream_cache{stream_capacity} {
 		init_time_stamps();
 		init_directory();
