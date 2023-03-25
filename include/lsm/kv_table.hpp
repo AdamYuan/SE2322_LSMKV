@@ -110,9 +110,10 @@ private:
 	using ValueIO = typename Trait::ValueIO;
 
 	std::unique_ptr<byte[]> m_bytes;
-	size_type m_size;
+	size_type m_size{};
 
 public:
+	inline KVValueBuffer() = default;
 	inline KVValueBuffer(std::unique_ptr<byte[]> &&bytes, size_type size) : m_bytes{std::move(bytes)}, m_size{size} {}
 
 	inline size_type GetSize() const { return m_size; }
@@ -213,33 +214,23 @@ public:
 	}
 };
 
-template <typename Key, typename Value, typename Trait> class KVBufferTable {
-private:
+template <typename Key, typename Value, typename Trait, typename ValueTable> class KVTableBase {
+protected:
 	using KeyTable = KVKeyTable<Key, Trait>;
-	using ValueBuffer = KVValueBuffer<Value, Trait>;
 
 	KeyTable m_keys;
-	ValueBuffer m_values;
+	ValueTable m_values;
 
-	template <typename, typename, typename> friend class KVFileTable;
 	template <typename, typename, typename, typename> friend class KVTableIterator;
 
 public:
-	using Iterator = KVTableIterator<Key, Value, Trait, KVBufferTable>;
-
-	inline KVBufferTable(KeyTable &&keys, ValueBuffer &&values)
-	    : m_keys{std::move(keys)}, m_values{std::move(values)} {}
+	using Iterator = KVTableIterator<Key, Value, Trait, KVTableBase>;
 
 	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
 	inline Key GetMinKey() const { return m_keys.GetMin(); }
 	inline Key GetMaxKey() const { return m_keys.GetMax(); }
 	inline size_type GetKeyCount() const { return m_keys.GetCount(); }
-	inline std::optional<Iterator> Find(Key key) const {
-		const KVKeyOffset<Key> *key_it = m_keys.Find(key);
-		if (key_it == nullptr)
-			return std::nullopt;
-		return Iterator{this, key_it};
-	}
+	inline Iterator Find(Key key) const { return Iterator{this, m_keys.Find(key)}; }
 	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
 	inline Iterator GetLowerBound(Key key) const { return Iterator{this, m_keys.GetLowerBound(key)}; }
 
@@ -252,59 +243,51 @@ public:
 	}
 };
 
-template <typename Key, typename Value, typename Trait> class KVFileTable {
+template <typename Key, typename Value, typename Trait>
+class KVBufferTable final : public KVTableBase<Key, Value, Trait, KVValueBuffer<Value, Trait>> {
 private:
+	using Base = KVTableBase<Key, Value, Trait, KVValueBuffer<Value, Trait>>;
+	using KeyTable = KVKeyTable<Key, Trait>;
+	using ValueBuffer = KVValueBuffer<Value, Trait>;
+
+	template <typename, typename, typename> friend class KVFileTable;
+
+public:
+	inline KVBufferTable(KeyTable &&keys, ValueBuffer &&values) {
+		Base::m_keys = std::move(keys);
+		Base::m_values = std::move(values);
+	}
+};
+
+template <typename Key, typename Value, typename Trait>
+class KVFileTable final : public KVTableBase<Key, Value, Trait, KVValueFile<Value, Trait>> {
+private:
+	using Base = KVTableBase<Key, Value, Trait, KVValueFile<Value, Trait>>;
 	using KeyTable = KVKeyTable<Key, Trait>;
 	using ValueFile = KVValueFile<Value, Trait>;
 
-	KeyTable m_keys;
-	ValueFile m_values;
-
 	std::filesystem::path m_file_path;
 
-	template <typename, typename, typename, typename> friend class KVTableIterator;
-
 public:
-	using Iterator = KVTableIterator<Key, Value, Trait, KVFileTable>;
-
 	inline KVFileTable(const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer)
 	    : m_file_path{file_path} {
-		m_keys = std::move(buffer.m_keys);
+		Base::m_keys = std::move(buffer.m_keys);
 		{
 			std::ofstream fout{file_path, std::ios::binary};
-			IO<KeyTable>::Write(fout, m_keys);
+			IO<KeyTable>::Write(fout, Base::m_keys);
 			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
 		}
-		m_values = ValueFile{std::ifstream{file_path, std::ios::binary}, IO<KeyTable>::GetSize(buffer.m_keys),
-		                     buffer.m_values.GetSize()};
+		Base::m_values = ValueFile{std::ifstream{file_path, std::ios::binary}, IO<KeyTable>::GetSize(buffer.m_keys),
+		                           buffer.m_values.GetSize()};
 	}
 	inline explicit KVFileTable(const std::filesystem::path &file_path) : m_file_path{file_path} {
 		std::ifstream fin{file_path, std::ios::binary};
-		m_keys = IO<KeyTable>::Read(fin);
-		size_type value_offset = IO<KeyTable>::GetSize(m_keys);
+		Base::m_keys = IO<KeyTable>::Read(fin);
+		size_type value_offset = IO<KeyTable>::GetSize(Base::m_keys);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
-		m_values = ValueFile{std::move(fin), value_offset, value_size};
+		Base::m_values = ValueFile{std::move(fin), value_offset, value_size};
 	}
-
 	inline const std::filesystem::path &GetFilePath() const { return m_file_path; }
-	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
-	inline Key GetMinKey() const { return m_keys.GetMin(); }
-	inline Key GetMaxKey() const { return m_keys.GetMax(); }
-	inline size_type GetKeyCount() const { return m_keys.GetCount(); }
-	inline Iterator Find(Key key) const {
-		const KVKeyOffset<Key> *key_it = m_keys.Find(key);
-		return Iterator{this, key_it};
-	}
-	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
-	inline Iterator GetLowerBound(Key key) const { return Iterator{this, m_keys.GetLowerBound(key)}; }
-
-	inline bool IsOverlap(Key min_key, Key max_key) const {
-		using Compare = typename Trait::Compare;
-		return !(Compare{}(GetMaxKey(), min_key) || Compare{}(max_key, GetMinKey()));
-	}
-	template <typename Table> inline bool IsOverlap(const Table &table) const {
-		return IsOverlap(table.GetMinKey(), table.GetMaxKey());
-	}
 };
 
 } // namespace lsm
