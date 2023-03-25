@@ -20,7 +20,7 @@ private:
 	std::vector<FileTable> m_file_tables;
 	std::vector<BufferTable> m_buffer_tables;
 	KVTableIteratorHeap<typename FileTable::Iterator> m_file_it_heap;
-	KVTableIteratorHeap<typename BufferTable ::Iterator> m_buffer_it_heap;
+	KVTableIteratorHeap<typename BufferTable::Iterator> m_buffer_it_heap;
 
 	KVMemAppender<Key, Value, Trait> m_mem_appender;
 

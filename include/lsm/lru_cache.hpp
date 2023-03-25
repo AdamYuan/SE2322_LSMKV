@@ -21,11 +21,11 @@ private:
 public:
 	inline explicit LRUCache(size_type capacity) : m_capacity(capacity) {}
 
-	template <typename Creator> inline Value &Push(const Key &key, Creator &&creator) {
+	template <typename Creator> inline Value &Push(Key &&key, Creator &&creator) {
 		auto it = m_map.find(key);
 		if (it == m_map.end()) {
 			m_list.emplace_front(key, creator(key));
-			m_map[key] = m_list.begin();
+			m_map.insert({std::move(key), m_list.begin()});
 			if (m_map.size() > m_capacity) {
 				auto last = m_list.end();
 				m_map.erase((--last)->first);
@@ -36,6 +36,9 @@ public:
 			m_list.splice(m_list.begin(), m_list, it->second);
 			return it->second->second;
 		}
+	}
+	template <typename Creator> inline Value &Push(const Key &key, Creator &&creator) {
+		return Push(Key(key), creator);
 	}
 };
 

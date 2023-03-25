@@ -47,7 +47,7 @@ private:
 		size_type m_offset;
 
 	public:
-		Wrapper(uint64_t &target, size_type offset) : m_target{target}, m_offset{offset} {}
+		inline Wrapper(uint64_t &target, size_type offset) : m_target{target}, m_offset{offset} {}
 		inline Wrapper &operator=(bool b) {
 			m_target |= b ? (1ULL << m_offset) : 0;
 			return *this;
