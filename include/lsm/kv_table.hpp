@@ -122,28 +122,25 @@ private:
 	using KeyFile = KVKeyFile<Key, Trait>;
 	using ValueFile = KVValueFile<Value, Trait>;
 
-	std::filesystem::path m_file_path;
-
 public:
-	inline KVFileTable(const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer)
-	    : m_file_path{file_path} {
+	inline KVFileTable(const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer) {
 		Base::m_keys = KeyFile{std::move(buffer.m_keys)};
 		{
 			std::ofstream fout{file_path, std::ios::binary};
 			IO<KeyFile>::Write(fout, Base::m_keys);
 			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
 		}
-		Base::m_values = ValueFile{std::ifstream{file_path, std::ios::binary}, IO<KeyFile>::GetSize(Base::m_keys),
-		                           buffer.m_values.GetSize()};
+		Base::m_values = ValueFile{file_path, std::ifstream{file_path, std::ios::binary},
+		                           IO<KeyFile>::GetSize(Base::m_keys), buffer.m_values.GetSize()};
 	}
-	inline explicit KVFileTable(const std::filesystem::path &file_path) : m_file_path{file_path} {
+	inline explicit KVFileTable(const std::filesystem::path &file_path) {
 		std::ifstream fin{file_path, std::ios::binary};
 		Base::m_keys = IO<KeyFile>::Read(fin);
 		size_type value_offset = IO<KeyFile>::GetSize(Base::m_keys);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
-		Base::m_values = ValueFile{std::move(fin), value_offset, value_size};
+		Base::m_values = ValueFile{file_path, std::move(fin), value_offset, value_size};
 	}
-	inline const std::filesystem::path &GetFilePath() const { return m_file_path; }
+	inline const std::filesystem::path &GetFilePath() const { return Base::m_values.GetFilePath(); }
 };
 
 } // namespace lsm

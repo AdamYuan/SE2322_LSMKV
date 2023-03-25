@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #include "io.hpp"
 #include "kv_trait.hpp"
 #include "type.hpp"
@@ -33,22 +35,26 @@ template <typename Value, typename Trait> class KVValueFile {
 private:
 	using ValueIO = typename Trait::ValueIO;
 
-	mutable std::ifstream m_file_stream;
+	std::filesystem::path m_file_path;
 	size_type m_offset{}, m_size{};
 
 public:
 	inline KVValueFile() = default;
-	inline KVValueFile(std::ifstream &&file_stream, size_type offset, size_type size)
-	    : m_file_stream{std::move(file_stream)}, m_offset{offset}, m_size{size} {}
+	inline KVValueFile(std::filesystem::path file_path, std::ifstream &&file_stream, size_type offset, size_type size)
+	    : m_file_path{std::move(file_path)}, m_offset{offset}, m_size{size} {}
+
+	inline const std::filesystem::path &GetFilePath() const { return m_file_path; }
 
 	inline size_type GetSize() const { return m_size; }
 	inline Value Read(size_type begin, size_type len) const {
-		m_file_stream.seekg(m_offset + begin);
-		return ValueIO::Read(m_file_stream, len);
+		std::ifstream fin = {m_file_path, std::ios::binary};
+		fin.seekg(m_offset + begin);
+		return ValueIO::Read(fin, len);
 	}
 	inline void CopyData(size_type begin, size_type len, char *dst) const {
-		m_file_stream.seekg(m_offset + begin);
-		m_file_stream.read(dst, len);
+		std::ifstream fin = {m_file_path, std::ios::binary};
+		fin.seekg(m_offset + begin);
+		fin.read(dst, len);
 	}
 };
 
