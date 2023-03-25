@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "buf_stream.hpp"
 #include "io.hpp"
 #include "kv_trait.hpp"
 #include "lru_cache.hpp"

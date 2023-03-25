@@ -5,6 +5,8 @@
 #include "kv_table.hpp"
 #include "kv_trait.hpp"
 
+#include "buf_stream.hpp"
+
 namespace lsm {
 
 template <typename Key, typename Value, typename Trait> class KVMemSkipList {
