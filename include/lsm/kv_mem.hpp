@@ -40,7 +40,7 @@ public:
 				    ValueIO::Write(value_stream, value_opt.value());
 		    });
 
-		return Buffer{KVKeyTable<Key, Trait>{time_stamp, std::move(key_buffer), m_skiplist.GetSize()},
+		return Buffer{KVKeyBuffer<Key, Trait>{time_stamp, std::move(key_buffer), m_skiplist.GetSize()},
 		              KVValueBuffer<Value, Trait>{std::move(value_buffer), value_size}};
 	}
 	inline std::optional<Buffer> Put(Key key, Value &&value, time_type time_stamp) {
@@ -122,7 +122,7 @@ public:
 		auto value_buffer = std::unique_ptr<byte[]>(new byte[m_value_buffer.size()]);
 		std::copy(m_value_buffer.begin(), m_value_buffer.end(), value_buffer.get());
 		return BufferTable{
-		    KVKeyTable<Key, Trait>{time_stamp, std::move(key_buffer), (size_type)m_key_offset_vec.size()},
+		    KVKeyBuffer<Key, Trait>{time_stamp, std::move(key_buffer), (size_type)m_key_offset_vec.size()},
 		    KVValueBuffer<Value, Trait>{std::move(value_buffer), (size_type)m_value_buffer.size()}};
 	}
 	template <bool Delete, typename Iterator>
