@@ -28,7 +28,7 @@ private:
 	std::vector<FileTable> m_levels[kLevels + 1];
 	time_type m_level_time_stamps[kLevels + 1]{};
 
-	LRUCache<time_type, std::ifstream> m_stream_cache;
+	LRUCache<std::filesystem::path, std::ifstream> m_stream_cache;
 
 	inline std::filesystem::path get_level_dir(level_type level) const {
 		return m_directory / (std::string{"level-"} + std::to_string(level));

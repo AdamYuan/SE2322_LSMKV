@@ -24,7 +24,7 @@ public:
 	template <typename Creator> inline Value &Push(const Key &key, Creator &&creator) {
 		auto it = m_map.find(key);
 		if (it == m_map.end()) {
-			m_list.emplace_front(key, creator());
+			m_list.emplace_front(key, creator(key));
 			m_map[key] = m_list.begin();
 			if (m_map.size() > m_capacity) {
 				auto last = m_list.end();

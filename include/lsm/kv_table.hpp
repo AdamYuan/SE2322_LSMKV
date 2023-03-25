@@ -123,26 +123,25 @@ private:
 	using ValueFile = KVValueFile<Value, Trait>;
 
 public:
-	inline KVFileTable(LRUCache<time_type, std::ifstream> *p_stream_cache, const std::filesystem::path &file_path,
-	                   KVBufferTable<Key, Value, Trait> &&buffer) {
+	inline KVFileTable(LRUCache<std::filesystem::path, std::ifstream> *p_stream_cache,
+	                   const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer) {
 		Base::m_keys = KeyFile{std::move(buffer.m_keys)};
 		{
 			std::ofstream fout{file_path, std::ios::binary};
 			IO<KeyFile>::Write(fout, Base::m_keys);
 			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
 		}
-		Base::m_values = ValueFile{p_stream_cache, file_path, Base::m_keys.GetTimeStamp(),
-		                           IO<KeyFile>::GetSize(Base::m_keys), buffer.m_values.GetSize()};
+		Base::m_values =
+		    ValueFile{p_stream_cache, file_path, IO<KeyFile>::GetSize(Base::m_keys), buffer.m_values.GetSize()};
 	}
-	inline explicit KVFileTable(LRUCache<time_type, std::ifstream> *p_stream_cache,
+	inline explicit KVFileTable(LRUCache<std::filesystem::path, std::ifstream> *p_stream_cache,
 	                            const std::filesystem::path &file_path) {
-		{
-			std::ifstream fin{file_path, std::ios::binary};
-			Base::m_keys = IO<KeyFile>::Read(fin);
-		}
+		Base::m_keys = IO<KeyFile>::Read(p_stream_cache->Push(file_path, [](const std::filesystem::path &path) {
+			return std::ifstream{path, std::ios::binary};
+		}));
 		size_type value_offset = IO<KeyFile>::GetSize(Base::m_keys);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
-		Base::m_values = ValueFile{p_stream_cache, file_path, Base::m_keys.GetTimeStamp(), value_offset, value_size};
+		Base::m_values = ValueFile{p_stream_cache, file_path, value_offset, value_size};
 	}
 	inline const std::filesystem::path &GetFilePath() const { return Base::m_values.GetFilePath(); }
 };
