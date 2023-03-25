@@ -50,13 +50,11 @@ private:
 
 		auto ap = list_ans.begin();
 		auto sp = list_stu.begin();
-		while (ap != list_ans.end()) {
-			if (sp != list_stu.end()) {
-				EXPECT((*ap).first, (*sp).first);
-				EXPECT((*ap).second, (*sp).second);
-				ap++;
-				sp++;
-			}
+		while (ap != list_ans.end() && sp != list_stu.end()) {
+			EXPECT((*ap).first, (*sp).first);
+			EXPECT((*ap).second, (*sp).second);
+			ap++;
+			sp++;
 		}
 
 		phase();

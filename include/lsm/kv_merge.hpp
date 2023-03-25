@@ -72,10 +72,14 @@ public:
 				m_buffer_it_heap.Proceed();
 			}
 		}
-		while (!m_file_it_heap.IsEmpty())
-			push_iterator<Delete>(m_file_it_heap.Proceed());
-		while (!m_buffer_it_heap.IsEmpty())
-			push_iterator<Delete>(m_buffer_it_heap.Proceed());
+		while (!m_file_it_heap.IsEmpty()) {
+			push_iterator<Delete>(m_file_it_heap.GetTop());
+			m_file_it_heap.Proceed();
+		}
+		while (!m_buffer_it_heap.IsEmpty()) {
+			push_iterator<Delete>(m_buffer_it_heap.GetTop());
+			m_buffer_it_heap.Proceed();
+		}
 
 		if (!m_mem_appender.IsEmpty())
 			m_result_tables.push_back(m_mem_appender.PopBuffer(m_time_stamp));

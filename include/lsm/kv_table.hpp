@@ -4,8 +4,8 @@
 #include <fstream>
 #include <utility>
 
-#include "kv_buffer_table.hpp"
 #include "kv_key_table.hpp"
+#include "kv_value_table.hpp"
 
 namespace lsm {
 
@@ -58,8 +58,8 @@ public:
 	}
 	inline bool IsEmpty() const { return m_vec.empty(); }
 	inline Iterator GetTop() const { return m_vec.front(); }
-	inline Iterator Proceed() {
-		Iterator ret = m_vec.front();
+	inline void Proceed() {
+		Key key = m_vec.front().GetKey();
 		do {
 			std::pop_heap(m_vec.begin(), m_vec.end(), RevCompare{});
 			m_vec.back().Proceed();
@@ -67,8 +67,7 @@ public:
 				std::push_heap(m_vec.begin(), m_vec.end(), RevCompare{});
 			else
 				m_vec.pop_back();
-		} while (!m_vec.empty() && !KeyCompare{}(ret.GetKey(), m_vec.front().GetKey()));
-		return ret;
+		} while (!m_vec.empty() && !KeyCompare{}(key, m_vec.front().GetKey()));
 	}
 };
 
