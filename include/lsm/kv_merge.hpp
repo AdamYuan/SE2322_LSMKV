@@ -10,7 +10,7 @@ namespace lsm {
 
 template <typename Key, typename Value, typename Trait, level_type Level> class KVMerger {
 private:
-	using FileSystem = KVFileSystem<Key, Value, Trait>;
+	using FileSystem = KVFileSystem<Trait>;
 
 	using KeyCompare = typename Trait::Compare;
 

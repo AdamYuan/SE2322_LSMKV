@@ -7,12 +7,11 @@
 
 namespace lsm {
 
-using KVStreamCache = LRUCache<std::filesystem::path, std::ifstream>;
-template <typename Key, typename Value, typename Trait> class KVFileSystem {
+template <typename Trait> class KVFileSystem {
 private:
 	constexpr static level_type kLevels = Trait::kLevels;
 
-	mutable KVStreamCache m_stream_cache;
+	mutable LRUCache<std::filesystem::path, std::ifstream> m_input_stream_cache;
 	std::filesystem::path m_directory;
 	time_type m_time_stamp;
 
@@ -27,7 +26,7 @@ private:
 
 public:
 	inline KVFileSystem(std::filesystem::path directory, size_type stream_capacity)
-	    : m_directory{std::move(directory)}, m_stream_cache{stream_capacity}, m_time_stamp{0} {
+	    : m_directory{std::move(directory)}, m_input_stream_cache{stream_capacity}, m_time_stamp{0} {
 		init_directory();
 	}
 
@@ -62,10 +61,18 @@ public:
 	}
 	inline time_type GetTimeStamp() const { return m_time_stamp; }
 
-	inline KVStreamCache &GetStreamCache() const { return m_stream_cache; }
+	inline std::ifstream &GetInputStream(const std::filesystem::path &file_path) const {
+		return m_input_stream_cache.Push(file_path, [](const std::filesystem::path &path) {
+			return std::ifstream{path, std::ios::binary};
+		});
+	}
+
+	inline std::ofstream AllocOutputStream(const std::filesystem::path &file_path) const {
+		return std::ofstream{file_path, std::ios::binary};
+	}
 
 	inline void Reset() {
-		m_stream_cache.Clear();
+		m_input_stream_cache.Clear();
 		if (std::filesystem::exists(m_directory))
 			std::filesystem::remove_all(m_directory);
 		m_time_stamp = 0;

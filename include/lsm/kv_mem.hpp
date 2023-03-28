@@ -11,7 +11,7 @@ namespace lsm {
 
 template <typename Key, typename Value, typename Trait> class KVMemSkipList {
 private:
-	using FileSystem = KVFileSystem<Key, Value, Trait>;
+	using FileSystem = KVFileSystem<Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
 	using FileTable = KVFileTable<Key, Value, Trait>;
 	using ValueIO = typename Trait::ValueIO;
@@ -148,7 +148,7 @@ public:
 
 template <typename Key, typename Value, typename Trait> class KVMemAppender {
 private:
-	using FileSystem = KVFileSystem<Key, Value, Trait>;
+	using FileSystem = KVFileSystem<Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
 	using FileTable = KVFileTable<Key, Value, Trait>;
 	using KeyOffset = KVKeyOffset<Key>;

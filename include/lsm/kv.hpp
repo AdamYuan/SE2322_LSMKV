@@ -17,7 +17,9 @@ private:
 	constexpr static level_type kLevels = Trait::kLevels;
 	constexpr static const KVLevelConfig *kLevelConfigs = Trait::kLevelConfigs;
 
-	using FileSystem = KVFileSystem<Key, Value, Trait>;
+	static_assert(kLevels == 0 || kLevelConfigs[0].type == KVLevelType::kTiering);
+
+	using FileSystem = KVFileSystem<Trait>;
 
 	using FileTable = KVFileTable<Key, Value, Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;

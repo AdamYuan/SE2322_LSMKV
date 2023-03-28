@@ -74,9 +74,10 @@ template <int Acceleration> struct LZ4StringIO {
 	}
 };
 
-template <typename Key, typename Value> struct MyTrait {
+template <typename Key> struct MyStringTrait {
 	using Compare = std::less<Key>;
-	using SkipList = lsm::SkipList<Key, lsm::KVSkipListValue<Value>, Compare, std::default_random_engine, 1, 2, 64>;
+	using SkipList =
+	    lsm::SkipList<Key, lsm::KVSkipListValue<std::string>, Compare, std::default_random_engine, 1, 2, 64>;
 	using Bloom = lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>;
 	using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
@@ -177,7 +178,7 @@ protected:
 		nr_passed_phases = 0;
 	}
 
-	lsm::KV<uint64_t, std::string, MyTrait<uint64_t, std::string>> store;
+	lsm::KV<uint64_t, std::string, MyStringTrait<uint64_t>> store;
 	bool verbose;
 
 public:

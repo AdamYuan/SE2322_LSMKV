@@ -35,32 +35,28 @@ public:
 
 template <typename Value, typename Trait> class KVValueFile {
 private:
+	using FileSystem = KVFileSystem<Trait>;
 	using ValueIO = typename Trait::ValueIO;
 
-	LRUCache<std::filesystem::path, std::ifstream> *m_p_stream_cache{};
+	FileSystem *m_p_file_system{};
 	std::filesystem::path m_file_path;
 	size_type m_offset{}, m_size{};
 
 public:
 	inline KVValueFile() = default;
-	inline KVValueFile(LRUCache<std::filesystem::path, std::ifstream> *p_stream_cache, std::filesystem::path file_path,
-	                   size_type offset, size_type size)
-	    : m_p_stream_cache{p_stream_cache}, m_file_path{std::move(file_path)}, m_offset{offset}, m_size{size} {}
+	inline KVValueFile(FileSystem *p_file_system, std::filesystem::path file_path, size_type offset, size_type size)
+	    : m_p_file_system{p_file_system}, m_file_path{std::move(file_path)}, m_offset{offset}, m_size{size} {}
 
 	inline const std::filesystem::path &GetFilePath() const { return m_file_path; }
 
 	inline size_type GetSize() const { return m_size; }
 	inline Value Read(size_type begin, size_type len) const {
-		std::ifstream &fin = m_p_stream_cache->Push(m_file_path, [](const std::filesystem::path &path) {
-			return std::ifstream{path, std::ios::binary};
-		});
+		std::ifstream &fin = m_p_file_system->GetInputStream(m_file_path);
 		fin.seekg(m_offset + begin);
 		return ValueIO::Read(fin, len);
 	}
 	inline void CopyData(size_type begin, size_type len, char *dst) const {
-		std::ifstream &fin = m_p_stream_cache->Push(m_file_path, [](const std::filesystem::path &path) {
-			return std::ifstream{path, std::ios::binary};
-		});
+		std::ifstream &fin = m_p_file_system->GetInputStream(m_file_path);
 		fin.seekg(m_offset + begin);
 		fin.read(dst, len);
 	}

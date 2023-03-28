@@ -124,7 +124,7 @@ class KVFileTable final : public KVTableBase<KVFileTable<Key, Value, Trait>, Key
                                              KVValueFile<Value, Trait>> {
 private:
 	using Base = KVTableBase<KVFileTable, Key, Value, Trait, KVKeyFile<Key, Trait>, KVValueFile<Value, Trait>>;
-	using FileSystem = KVFileSystem<Key, Value, Trait>;
+	using FileSystem = KVFileSystem<Trait>;
 	using KeyFile = KVKeyFile<Key, Trait>;
 	using ValueFile = KVValueFile<Value, Trait>;
 
@@ -141,14 +141,14 @@ public:
 		Base::m_keys = KeyFile{std::move(buffer.m_keys)};
 		auto file_path = p_file_system->GetFilePath(level);
 		{
-			std::ofstream fout{file_path, std::ios::binary};
+			std::ofstream fout = p_file_system->AllocOutputStream(file_path);
 			IO<time_type>::Write(fout, m_time_stamp);
 			IO<KeyFile>::Write(fout, Base::m_keys);
 			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
 		}
 		Base::m_values =
-		    ValueFile{&p_file_system->GetStreamCache(), file_path,
-		              IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type), buffer.m_values.GetSize()};
+		    ValueFile{p_file_system, file_path, IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type),
+		              buffer.m_values.GetSize()};
 
 		p_file_system->NextTimeStamp();
 	}
@@ -159,27 +159,25 @@ public:
 		Base::m_keys = KeyFile{std::move(key_buffer)};
 		auto file_path = p_file_system->GetFilePath(level);
 		{
-			std::ofstream fout{file_path, std::ios::binary};
+			std::ofstream fout = p_file_system->AllocOutputStream(file_path);
 			IO<time_type>::Write(fout, m_time_stamp);
 			IO<KeyFile>::Write(fout, Base::m_keys);
 			value_writer(fout);
 		}
-		Base::m_values = ValueFile{&p_file_system->GetStreamCache(), file_path,
+		Base::m_values = ValueFile{p_file_system, file_path,
 		                           IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type), value_size};
 
 		p_file_system->NextTimeStamp();
 	}
 	inline explicit KVFileTable(FileSystem *p_file_system, const std::filesystem::path &file_path, level_type level)
 	    : m_level{level} {
-		std::ifstream &fin = p_file_system->GetStreamCache().Push(file_path, [](const std::filesystem::path &path) {
-			return std::ifstream{path, std::ios::binary};
-		});
+		std::ifstream &fin = p_file_system->GetInputStream(file_path);
 		fin.seekg(0);
 		m_time_stamp = IO<time_type>::Read(fin);
 		Base::m_keys = IO<KeyFile>::Read(fin);
 		size_type value_offset = IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
-		Base::m_values = ValueFile{&p_file_system->GetStreamCache(), file_path, value_offset, value_size};
+		Base::m_values = ValueFile{p_file_system, file_path, value_offset, value_size};
 
 		p_file_system->MaintainTimeStamp(m_time_stamp);
 	}
