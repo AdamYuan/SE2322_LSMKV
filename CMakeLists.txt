@@ -8,7 +8,7 @@ add_library(lsmkv INTERFACE)
 target_include_directories(lsmkv INTERFACE include)
 target_link_libraries(lsmkv INTERFACE stdc++fs)
 
-add_subdirectory(test/dep/snappy)
+add_subdirectory(test/snappy)
 
 add_executable(lsmkv_correctness_test test/correctness.cpp)
 target_link_libraries(lsmkv_correctness_test PRIVATE lsmkv snappy)
