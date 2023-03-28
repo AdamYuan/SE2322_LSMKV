@@ -200,6 +200,7 @@ public:
 					goto End_Check;
 				}
 			}
+			return false;
 		}
 	End_Check:
 		if (is_level_0_full()) {
