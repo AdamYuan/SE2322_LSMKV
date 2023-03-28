@@ -101,7 +101,12 @@ private:
 		compaction<0>(std::move(table_table_vec));
 	}
 
-	inline bool is_level_0_full() const { return m_levels[0].size() >= kLevelConfigs[0].max_files; }
+	inline bool is_level_0_full() const {
+		if constexpr (kLevels > 0)
+			return m_levels[0].size() >= kLevelConfigs[0].max_files;
+		else
+			return false;
+	}
 
 public:
 	inline explicit KV(std::string_view directory, size_type stream_capacity = 32)
