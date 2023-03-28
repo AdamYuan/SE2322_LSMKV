@@ -40,6 +40,10 @@ public:
 	template <typename Creator> inline Value &Push(const Key &key, Creator &&creator) {
 		return Push(Key(key), creator);
 	}
+	inline void Clear() {
+		m_map.clear();
+		m_list.clear();
+	}
 };
 
 } // namespace lsm

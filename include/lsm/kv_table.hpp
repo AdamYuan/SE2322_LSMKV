@@ -4,6 +4,7 @@
 #include <fstream>
 #include <utility>
 
+#include "kv_filesystem.hpp"
 #include "kv_key_table.hpp"
 #include "kv_value_table.hpp"
 
@@ -13,12 +14,11 @@ template <typename Key, typename Value, typename Trait, typename Table> class KV
 private:
 	const Table *m_p_table;
 	const KVKeyOffset<Key> *m_p_key_offset;
-	time_type m_time_stamp;
 
 public:
 	inline KVTableIterator(const Table *p_table, const KVKeyOffset<Key> *p_key_offset)
-	    : m_p_table{p_table}, m_p_key_offset{p_key_offset}, m_time_stamp{m_p_table->GetTimeStamp()} {}
-	inline time_type GetTimeStamp() const { return m_time_stamp; }
+	    : m_p_table{p_table}, m_p_key_offset{p_key_offset} {}
+	inline const Table &GetTable() const { return *m_p_table; }
 	inline bool IsValid() const { return m_p_key_offset != m_p_table->m_keys.GetEnd(); }
 	inline bool IsKeyDeleted() const { return m_p_key_offset->IsDeleted(); }
 	inline Key GetKey() const { return m_p_key_offset->GetKey(); }
@@ -43,7 +43,7 @@ private:
 	struct Compare {
 		inline bool operator()(const Iterator &l, const Iterator &r) const {
 			return KeyCompare{}(l.GetKey(), r.GetKey()) ||
-			       (!KeyCompare{}(r.GetKey(), l.GetKey()) && l.GetTimeStamp() > r.GetTimeStamp());
+			       (!KeyCompare{}(r.GetKey(), l.GetKey()) && l.GetTable().IsPrior(r.GetTable()));
 		}
 	};
 	struct RevCompare {
@@ -71,23 +71,26 @@ public:
 	}
 };
 
-template <typename Key, typename Value, typename Trait, typename KeyTable, typename ValueTable> class KVTableBase {
+template <typename DerivedTable, typename Key, typename Value, typename Trait, typename KeyTable, typename ValueTable>
+class KVTableBase {
 protected:
 	KeyTable m_keys;
 	ValueTable m_values;
 
 	template <typename, typename, typename, typename> friend class KVTableIterator;
 
-public:
-	using Iterator = KVTableIterator<Key, Value, Trait, KVTableBase>;
+	inline DerivedTable *derived_this() { return static_cast<DerivedTable *>(this); }
+	inline const DerivedTable *derived_this() const { return static_cast<const DerivedTable *>(this); }
 
-	inline time_type GetTimeStamp() const { return m_keys.GetTimeStamp(); }
+public:
+	using Iterator = KVTableIterator<Key, Value, Trait, DerivedTable>;
+
 	inline Key GetMinKey() const { return m_keys.GetMin(); }
 	inline Key GetMaxKey() const { return m_keys.GetMax(); }
 	inline size_type GetKeyCount() const { return m_keys.GetCount(); }
-	inline Iterator Find(Key key) const { return Iterator{this, m_keys.Find(key)}; }
-	inline Iterator GetBegin() const { return Iterator{this, m_keys.GetBegin()}; }
-	inline Iterator GetLowerBound(Key key) const { return Iterator{this, m_keys.GetLowerBound(key)}; }
+	inline Iterator Find(Key key) const { return Iterator{derived_this(), m_keys.Find(key)}; }
+	inline Iterator GetBegin() const { return Iterator{derived_this(), m_keys.GetBegin()}; }
+	inline Iterator GetLowerBound(Key key) const { return Iterator{derived_this(), m_keys.GetLowerBound(key)}; }
 
 	inline bool IsOverlap(Key min_key, Key max_key) const {
 		using Compare = typename Trait::Compare;
@@ -99,16 +102,17 @@ public:
 };
 
 template <typename Key, typename Value, typename Trait>
-class KVBufferTable final
-    : public KVTableBase<Key, Value, Trait, KVKeyBuffer<Key, Trait>, KVValueBuffer<Value, Trait>> {
+class KVBufferTable final : public KVTableBase<KVBufferTable<Key, Value, Trait>, Key, Value, Trait,
+                                               KVKeyBuffer<Key, Trait>, KVValueBuffer<Value, Trait>> {
 private:
-	using Base = KVTableBase<Key, Value, Trait, KVKeyBuffer<Key, Trait>, KVValueBuffer<Value, Trait>>;
+	using Base = KVTableBase<KVBufferTable, Key, Value, Trait, KVKeyBuffer<Key, Trait>, KVValueBuffer<Value, Trait>>;
 	using KeyBuffer = KVKeyBuffer<Key, Trait>;
 	using ValueBuffer = KVValueBuffer<Value, Trait>;
 
 	template <typename, typename, typename> friend class KVFileTable;
 
 public:
+	inline static bool IsPrior(const KVBufferTable &) { return true; }
 	inline KVBufferTable(KeyBuffer &&keys, ValueBuffer &&values) {
 		Base::m_keys = std::move(keys);
 		Base::m_values = std::move(values);
@@ -116,32 +120,68 @@ public:
 };
 
 template <typename Key, typename Value, typename Trait>
-class KVFileTable final : public KVTableBase<Key, Value, Trait, KVKeyFile<Key, Trait>, KVValueFile<Value, Trait>> {
+class KVFileTable final : public KVTableBase<KVFileTable<Key, Value, Trait>, Key, Value, Trait, KVKeyFile<Key, Trait>,
+                                             KVValueFile<Value, Trait>> {
 private:
-	using Base = KVTableBase<Key, Value, Trait, KVKeyFile<Key, Trait>, KVValueFile<Value, Trait>>;
+	using Base = KVTableBase<KVFileTable, Key, Value, Trait, KVKeyFile<Key, Trait>, KVValueFile<Value, Trait>>;
+	using FileSystem = KVFileSystem<Key, Value, Trait>;
 	using KeyFile = KVKeyFile<Key, Trait>;
 	using ValueFile = KVValueFile<Value, Trait>;
 
+	time_type m_time_stamp{};
+	level_type m_level{};
+
 public:
-	inline KVFileTable(LRUCache<std::filesystem::path, std::ifstream> *p_stream_cache,
-	                   const std::filesystem::path &file_path, KVBufferTable<Key, Value, Trait> &&buffer) {
+	inline time_type GetTimeStamp() const { return m_time_stamp; }
+	inline bool IsPrior(const KVFileTable &r) const {
+		return m_level < r.m_level || (m_level == r.m_level && m_time_stamp > r.m_time_stamp);
+	}
+	inline KVFileTable(FileSystem *p_file_system, KVBufferTable<Key, Value, Trait> &&buffer, level_type level)
+	    : m_level{level}, m_time_stamp{p_file_system->GetTimeStamp()} {
 		Base::m_keys = KeyFile{std::move(buffer.m_keys)};
+		auto file_path = p_file_system->GetFilePath(level);
 		{
 			std::ofstream fout{file_path, std::ios::binary};
+			IO<time_type>::Write(fout, m_time_stamp);
 			IO<KeyFile>::Write(fout, Base::m_keys);
 			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
 		}
 		Base::m_values =
-		    ValueFile{p_stream_cache, file_path, IO<KeyFile>::GetSize(Base::m_keys), buffer.m_values.GetSize()};
+		    ValueFile{&p_file_system->GetStreamCache(), file_path,
+		              IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type), buffer.m_values.GetSize()};
+
+		p_file_system->NextTimeStamp();
 	}
-	inline explicit KVFileTable(LRUCache<std::filesystem::path, std::ifstream> *p_stream_cache,
-	                            const std::filesystem::path &file_path) {
-		Base::m_keys = IO<KeyFile>::Read(p_stream_cache->Push(file_path, [](const std::filesystem::path &path) {
+	template <typename ValueWriter>
+	inline KVFileTable(FileSystem *p_file_system, KVKeyBuffer<Key, Trait> &&key_buffer, ValueWriter &&value_writer,
+	                   size_type value_size, level_type level)
+	    : m_level{level}, m_time_stamp{p_file_system->GetTimeStamp()} {
+		Base::m_keys = KeyFile{std::move(key_buffer)};
+		auto file_path = p_file_system->GetFilePath(level);
+		{
+			std::ofstream fout{file_path, std::ios::binary};
+			IO<time_type>::Write(fout, m_time_stamp);
+			IO<KeyFile>::Write(fout, Base::m_keys);
+			value_writer(fout);
+		}
+		Base::m_values = ValueFile{&p_file_system->GetStreamCache(), file_path,
+		                           IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type), value_size};
+
+		p_file_system->NextTimeStamp();
+	}
+	inline explicit KVFileTable(FileSystem *p_file_system, const std::filesystem::path &file_path, level_type level)
+	    : m_level{level} {
+		std::ifstream &fin = p_file_system->GetStreamCache().Push(file_path, [](const std::filesystem::path &path) {
 			return std::ifstream{path, std::ios::binary};
-		}));
-		size_type value_offset = IO<KeyFile>::GetSize(Base::m_keys);
+		});
+		fin.seekg(0);
+		m_time_stamp = IO<time_type>::Read(fin);
+		Base::m_keys = IO<KeyFile>::Read(fin);
+		size_type value_offset = IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
-		Base::m_values = ValueFile{p_stream_cache, file_path, value_offset, value_size};
+		Base::m_values = ValueFile{&p_file_system->GetStreamCache(), file_path, value_offset, value_size};
+
+		p_file_system->MaintainTimeStamp(m_time_stamp);
 	}
 	inline const std::filesystem::path &GetFilePath() const { return Base::m_values.GetFilePath(); }
 };

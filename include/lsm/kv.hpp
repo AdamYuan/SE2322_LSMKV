@@ -17,54 +17,24 @@ private:
 	constexpr static level_type kLevels = Trait::kLevels;
 	constexpr static const KVLevelConfig *kLevelConfigs = Trait::kLevelConfigs;
 
+	using FileSystem = KVFileSystem<Key, Value, Trait>;
+
 	using FileTable = KVFileTable<Key, Value, Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
 	using MemSkipList = KVMemSkipList<Key, Value, Trait>;
 	using Compare = typename Trait::Compare;
 
-	std::filesystem::path m_directory;
-
 	MemSkipList m_mem_skiplist;
 	std::vector<FileTable> m_levels[kLevels + 1];
-	time_type m_level_time_stamps[kLevels + 1]{};
 
-	LRUCache<std::filesystem::path, std::ifstream> m_stream_cache;
+	FileSystem m_file_system;
 
-	inline std::filesystem::path get_level_dir(level_type level) const {
-		return m_directory / (std::string{"level-"} + std::to_string(level));
-	}
-	inline std::filesystem::path get_file_path(uint64_t time_stap, level_type level) const {
-		return get_level_dir(level) / (std::to_string(time_stap) + ".sst");
-	}
-
-	inline void init_directory() {
-		if (!std::filesystem::exists(m_directory))
-			std::filesystem::create_directory(m_directory);
-		for (level_type level = 0; level <= kLevels; ++level) {
-			if (!std::filesystem::exists(get_level_dir(level)))
-				std::filesystem::create_directory(get_level_dir(level));
-		}
-	}
-	inline void init_time_stamps() {
-		constexpr time_type kUnit = std::numeric_limits<time_type>::max() / (kLevels + 1);
-		for (level_type l = 0; l <= kLevels; ++l)
-			m_level_time_stamps[l] = kUnit * (kLevels - l);
-	}
 	template <level_type Level> void compaction(std::vector<BufferTable> &&src_buffer_tables) {
 		auto &level_vec = m_levels[Level];
 
-		if constexpr (Level == kLevels) {
-			for (auto &buffer_table : src_buffer_tables)
-				level_vec.push_back(FileTable{&m_stream_cache, get_file_path(buffer_table.GetTimeStamp(), Level),
-				                              std::move(buffer_table)});
-			return;
-		} else {
-			if (level_vec.size() + src_buffer_tables.size() <= kLevelConfigs[Level].max_files) {
-				for (auto &buffer_table : src_buffer_tables)
-					level_vec.push_back(FileTable{&m_stream_cache, get_file_path(buffer_table.GetTimeStamp(), Level),
-					                              std::move(buffer_table)});
+		if constexpr (Level < kLevels) {
+			if (src_buffer_tables.empty())
 				return;
-			}
 
 			std::vector<FileTable> src_file_tables;
 			if constexpr (kLevelConfigs[Level].type == KVLevelType::kTiering) {
@@ -72,24 +42,18 @@ private:
 					src_file_tables.push_back(std::move(table));
 				level_vec.clear();
 			} else { // Leveling
-				auto src_buffer_crop_it = src_buffer_tables.end() - (kLevelConfigs[Level].max_files - level_vec.size());
-				for (auto it = src_buffer_crop_it; it != src_buffer_tables.end(); ++it) {
-					auto &buffer_table = *it;
-					level_vec.push_back(FileTable{&m_stream_cache, get_file_path(buffer_table.GetTimeStamp(), Level),
-					                              std::move(buffer_table)});
-				}
-				src_buffer_tables.erase(src_buffer_crop_it, src_buffer_tables.end());
-
 				while (level_vec.size() > kLevelConfigs[Level].max_files) {
 					auto &table = level_vec.back();
 					src_file_tables.push_back(std::move(table));
 					level_vec.pop_back();
 				}
 			}
+
+			auto &next_level_vec = m_levels[Level + 1];
+
 			// Find Overlapped Tables in Next Level
 			if constexpr (Level + 1 == kLevels || kLevelConfigs[Level + 1].type == KVLevelType::kLeveling) {
 				size_type src_file_table_size = src_file_tables.size();
-				auto &next_level_vec = m_levels[Level + 1];
 				next_level_vec.erase(
 				    std::remove_if(next_level_vec.begin(), next_level_vec.end(),
 				                   [this, &src_file_tables, &src_buffer_tables, src_file_table_size](auto &table) {
@@ -112,11 +76,18 @@ private:
 			for (const auto &table : src_file_tables)
 				deleted_file_paths.push_back(table.GetFilePath());
 
+			size_type max_append_files = 0;
+			if constexpr (Level + 1 == kLevels)
+				max_append_files = std::numeric_limits<size_type>::max();
+			else if constexpr (kLevelConfigs[Level + 1].type == KVLevelType::kLeveling)
+				max_append_files = std::max(kLevelConfigs[Level + 1].max_files, (size_type)next_level_vec.size()) -
+				                   (size_type)next_level_vec.size();
+
 			std::vector<BufferTable> dst_buffer_tables =
-			    KVMerger<Key, Value, Trait>{std::move(src_file_tables), std::move(src_buffer_tables),
-			                                m_level_time_stamps[Level + 1]}
-			        .template Run<Level + 1 == kLevels>();
-			m_level_time_stamps[Level + 1] += dst_buffer_tables.size();
+			    KVMerger<Key, Value, Trait, Level + 1>{std::move(src_file_tables), std::move(src_buffer_tables),
+			                                           &m_file_system}
+			        .Run(max_append_files,
+			             [this](FileTable &&file_table) { m_levels[Level + 1].push_back(std::move(file_table)); });
 
 			compaction<Level + 1>(std::move(dst_buffer_tables));
 
@@ -124,57 +95,41 @@ private:
 				std::filesystem::remove(file_path);
 		}
 	}
-	inline void store_buffer_table(BufferTable &&buffer_table) {
-		std::vector<BufferTable> buffer_tables;
-		buffer_tables.push_back(std::move(buffer_table));
-		compaction<0>(std::move(buffer_tables));
-		/* for (auto &level_vec : m_levels)
-		    if (!std::is_sorted(level_vec.begin(), level_vec.end(),
-		                        [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); })) {
-		        printf("Not Sorted\n");
-		    }*/
+	inline void compaction_0(BufferTable &&buffer_table) {
+		std::vector<BufferTable> table_table_vec;
+		table_table_vec.push_back(std::move(buffer_table));
+		compaction<0>(std::move(table_table_vec));
 	}
+
+	inline bool is_level_0_full() const { return m_levels[0].size() >= kLevelConfigs[0].max_files; }
 
 public:
 	inline explicit KV(std::string_view directory, size_type stream_capacity = 32)
-	    : m_directory{directory}, m_stream_cache{stream_capacity} {
-		init_time_stamps();
-		init_directory();
-		for (const auto &level_dir : std::filesystem::directory_iterator(m_directory)) {
-			if (!level_dir.is_directory())
-				continue;
-			auto level_dir_name = level_dir.path().filename().string();
-			if (level_dir_name.size() > 6 && level_dir_name.substr(0, 6) == "level-") {
-				level_type level = std::stoull(level_dir_name.substr(6));
-				if (level > kLevels)
-					continue;
-				for (const auto &file : std::filesystem::directory_iterator(level_dir)) {
-					if (!file.is_regular_file())
-						continue;
-					if (!file.path().has_extension() || file.path().extension() != ".sst")
-						continue;
-					auto file_table = FileTable{&m_stream_cache, file.path()};
-					m_level_time_stamps[level] = std::max(m_level_time_stamps[level], file_table.GetTimeStamp() + 1);
-					m_levels[level].push_back(std::move(file_table));
-				}
-			}
-		}
-		for (auto &level_vec : m_levels)
-			std::sort(level_vec.begin(), level_vec.end(),
-			          [](const auto &l, const auto &r) { return l.GetTimeStamp() < r.GetTimeStamp(); });
+	    : m_file_system{directory, stream_capacity} {
+		m_file_system.ForEachFile([this](const std::filesystem::path &file_path, level_type level) {
+			auto file_table = FileTable{&m_file_system, file_path, level};
+			m_levels[level].push_back(std::move(file_table));
+		});
 	}
 
 	inline ~KV() {
-		if (!m_mem_skiplist.IsEmpty())
-			FileTable{nullptr, get_file_path(m_level_time_stamps[0], 0),
-			          m_mem_skiplist.PopBuffer(m_level_time_stamps[0])};
+		if (!m_mem_skiplist.IsEmpty()) {
+			if (is_level_0_full())
+				compaction_0(m_mem_skiplist.PopBuffer());
+			else
+				m_mem_skiplist.PopFile(&m_file_system, 0);
+		}
 	}
 
 	inline void Put(Key key, Value &&value) {
-		std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Put(key, std::move(value), m_level_time_stamps[0]);
-		if (opt_buffer_table.has_value()) {
-			++m_level_time_stamps[0];
-			store_buffer_table(std::move(opt_buffer_table.value()));
+		if (is_level_0_full()) {
+			std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Put(key, std::move(value));
+			if (opt_buffer_table.has_value())
+				compaction_0(std::move(opt_buffer_table.value()));
+		} else {
+			std::optional<FileTable> opt_file_table = m_mem_skiplist.Put(key, std::move(value), &m_file_system, 0);
+			if (opt_file_table.has_value())
+				m_levels[0].push_back(std::move(opt_file_table.value()));
 		}
 	}
 
@@ -247,10 +202,14 @@ public:
 			}
 		}
 	End_Check:
-		std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Delete(key, m_level_time_stamps[0]);
-		if (opt_buffer_table.has_value()) {
-			++m_level_time_stamps[0];
-			store_buffer_table(std::move(opt_buffer_table.value()));
+		if (is_level_0_full()) {
+			std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Delete(key);
+			if (opt_buffer_table.has_value())
+				compaction_0(std::move(opt_buffer_table.value()));
+		} else {
+			std::optional<FileTable> opt_file_table = m_mem_skiplist.Delete(key, &m_file_system, 0);
+			if (opt_file_table.has_value())
+				m_levels[0].push_back(std::move(opt_file_table.value()));
 		}
 		return true;
 	}
@@ -259,11 +218,7 @@ public:
 		m_mem_skiplist.Reset();
 		for (auto &level_vec : m_levels)
 			level_vec.clear();
-
-		if (std::filesystem::exists(m_directory))
-			std::filesystem::remove_all(m_directory);
-		init_directory();
-		init_time_stamps();
+		m_file_system.Reset();
 	}
 };
 

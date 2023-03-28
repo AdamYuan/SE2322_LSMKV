@@ -2,16 +2,18 @@
 
 #include <vector>
 
+#include "buf_stream.hpp"
+#include "kv_filesystem.hpp"
 #include "kv_table.hpp"
 #include "kv_trait.hpp"
-
-#include "buf_stream.hpp"
 
 namespace lsm {
 
 template <typename Key, typename Value, typename Trait> class KVMemSkipList {
 private:
-	using Buffer = KVBufferTable<Key, Value, Trait>;
+	using FileSystem = KVFileSystem<Key, Value, Trait>;
+	using BufferTable = KVBufferTable<Key, Value, Trait>;
+	using FileTable = KVFileTable<Key, Value, Trait>;
 	using ValueIO = typename Trait::ValueIO;
 	using KeyOffset = KVKeyOffset<Key>;
 
@@ -22,30 +24,8 @@ private:
 	typename Trait::SkipList m_skiplist;
 	size_type m_file_size{kInitialFileSize};
 
-public:
-	inline void Reset() {
-		m_skiplist.Clear();
-		m_file_size = kInitialFileSize;
-	}
-	inline Buffer PopBuffer(time_type time_stamp) {
-		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_skiplist.GetSize()]);
-
-		size_type value_size = m_file_size - kInitialFileSize - m_skiplist.GetSize() * sizeof(KeyOffset);
-		auto value_buffer = std::unique_ptr<byte[]>(new byte[value_size]);
-		OBufStream value_stream{(char *)value_buffer.get()};
-
-		size_type key_id = 0;
-		m_skiplist.ForEach(
-		    [&key_buffer, &key_id, &value_stream](const Key &key, const std::optional<Value> &value_opt) {
-			    key_buffer[key_id++] = KeyOffset{key, value_stream.pos, !value_opt.has_value()};
-			    if (value_opt.has_value())
-				    ValueIO::Write(value_stream, value_opt.value());
-		    });
-
-		return Buffer{KVKeyBuffer<Key, Trait>{time_stamp, std::move(key_buffer), m_skiplist.GetSize()},
-		              KVValueBuffer<Value, Trait>{std::move(value_buffer), value_size}};
-	}
-	inline std::optional<Buffer> Put(Key key, Value &&value, time_type time_stamp) {
+	template <typename Table, typename PopFunc>
+	inline std::optional<Table> put(Key key, Value &&value, PopFunc &&pop_func) {
 		if (m_skiplist.Replace(key, [this, &value](std::optional<Value> *p_opt_value, bool exists) -> bool {
 			    size_type new_size = m_file_size;
 			    if (exists) {
@@ -61,16 +41,14 @@ public:
 		    }))
 			return std::nullopt;
 
-		auto ret = PopBuffer(time_stamp);
+		Table ret = pop_func();
 		Reset();
 		m_file_size += sizeof(KeyOffset) + ValueIO::GetSize(value);
 		m_skiplist.Insert(key, std::optional<Value>{std::move(value)});
-		return {std::move(ret)};
+		return std::optional<Table>{std::move(ret)};
 	}
-	inline std::optional<Buffer> Put(Key key, const Value &value, time_type time_stamp) {
-		return Put(key, Value{value}, time_stamp);
-	}
-	inline std::optional<Buffer> Delete(Key key, time_type time_stamp) {
+
+	template <typename Table, typename PopFunc> inline std::optional<Table> del(Key key, PopFunc &&pop_func) {
 		if (m_skiplist.Replace(key, [this](std::optional<Value> *p_opt_value, bool exists) -> bool {
 			    size_type new_size = m_file_size;
 			    if (exists)
@@ -85,12 +63,81 @@ public:
 		    }))
 			return std::nullopt;
 
-		auto ret = PopBuffer(time_stamp);
+		Table ret = pop_func();
 		Reset();
 		m_file_size += sizeof(KeyOffset);
 		m_skiplist.Insert(key, std::nullopt);
-		return {std::move(ret)};
+		return std::optional<Table>{std::move(ret)};
 	}
+
+public:
+	inline void Reset() {
+		m_skiplist.Clear();
+		m_file_size = kInitialFileSize;
+	}
+	inline BufferTable PopBuffer() {
+		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_skiplist.GetSize()]);
+
+		size_type value_size = m_file_size - kInitialFileSize - m_skiplist.GetSize() * sizeof(KeyOffset);
+		auto value_buffer = std::unique_ptr<byte[]>(new byte[value_size]);
+		OBufStream value_stream{(char *)value_buffer.get()};
+
+		size_type key_id = 0;
+		m_skiplist.ForEach(
+		    [&key_buffer, &key_id, &value_stream](const Key &key, const std::optional<Value> &value_opt) {
+			    key_buffer[key_id++] = KeyOffset{key, value_stream.pos, !value_opt.has_value()};
+			    if (value_opt.has_value())
+				    ValueIO::Write(value_stream, value_opt.value());
+		    });
+
+		return BufferTable{KVKeyBuffer<Key, Trait>{std::move(key_buffer), m_skiplist.GetSize()},
+		                   KVValueBuffer<Value, Trait>{std::move(value_buffer), value_size}};
+	}
+	inline FileTable PopFile(FileSystem *p_file_system, level_type level) {
+		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_skiplist.GetSize()]);
+
+		size_type value_size = m_file_size - kInitialFileSize - m_skiplist.GetSize() * sizeof(KeyOffset);
+
+		{
+			size_type key_id = 0, value_pos = 0;
+			m_skiplist.ForEach(
+			    [&key_buffer, &key_id, &value_pos](const Key &key, const std::optional<Value> &value_opt) {
+				    key_buffer[key_id++] = KeyOffset{key, value_pos, !value_opt.has_value()};
+				    if (value_opt.has_value())
+					    value_pos += ValueIO::GetSize(value_opt.value());
+			    });
+		}
+
+		const auto value_writer = [this](std::ofstream &stream) {
+			m_skiplist.ForEach([&stream](const Key &key, const std::optional<Value> &value_opt) {
+				if (value_opt.has_value())
+					ValueIO::Write(stream, value_opt.value());
+			});
+		};
+
+		return FileTable{p_file_system, KVKeyBuffer<Key, Trait>{std::move(key_buffer), m_skiplist.GetSize()},
+		                 value_writer, value_size, level};
+	}
+	inline std::optional<BufferTable> Put(Key key, Value &&value) {
+		return put<BufferTable>(key, std::move(value), [this]() { return PopBuffer(); });
+	}
+	inline std::optional<BufferTable> Put(Key key, const Value &value) { return Put(key, Value{value}); }
+
+	inline std::optional<FileTable> Put(Key key, Value &&value, FileSystem *p_file_system, level_type level) {
+		return put<FileTable>(key, std::move(value),
+		                      [this, p_file_system, level]() { return PopFile(p_file_system, level); });
+	}
+	inline std::optional<FileTable> Put(Key key, const Value &value, FileSystem *p_file_system, level_type level) {
+		return Put(key, Value(value), p_file_system, level);
+	}
+
+	inline std::optional<BufferTable> Delete(Key key) {
+		return del<BufferTable>(key, [this]() { return PopBuffer(); });
+	}
+	inline std::optional<FileTable> Delete(Key key, FileSystem *p_file_system, level_type level) {
+		return del<FileTable>(key, [this, p_file_system, level]() { return PopFile(p_file_system, level); });
+	}
+
 	template <typename Func> inline void Scan(Key min_key, Key max_key, Func &&func) const {
 		m_skiplist.Scan(min_key, max_key, std::forward<Func>(func));
 	}
@@ -100,7 +147,9 @@ public:
 
 template <typename Key, typename Value, typename Trait> class KVMemAppender {
 private:
+	using FileSystem = KVFileSystem<Key, Value, Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
+	using FileTable = KVFileTable<Key, Value, Trait>;
 	using KeyOffset = KVKeyOffset<Key>;
 
 	constexpr static size_type kMaxFileSize = Trait::kSingleFileSizeLimit;
@@ -116,7 +165,8 @@ private:
 	inline void reset_value_buffer() {
 		m_value_buffer_size = 0;
 		m_value_buffer_cap = kMaxFileSize - kInitialFileSize;
-		m_value_buffer = std::unique_ptr<byte[]>(new byte[kMaxFileSize - kInitialFileSize]);
+		if (!m_value_buffer)
+			m_value_buffer = std::unique_ptr<byte[]>(new byte[kMaxFileSize - kInitialFileSize]);
 	}
 	inline void ensure_value_buffer_cap(size_type size) {
 		if (size <= m_value_buffer_cap)
@@ -126,22 +176,8 @@ private:
 		m_value_buffer = std::move(new_buffer);
 	}
 
-public:
-	inline KVMemAppender() { reset_value_buffer(); }
-	inline void Reset() {
-		m_file_size = kInitialFileSize;
-		m_key_offset_vec.clear();
-		reset_value_buffer();
-	}
-	inline BufferTable PopBuffer(time_type time_stamp) {
-		auto key_buffer = std::unique_ptr<KeyOffset[]>(new KeyOffset[m_key_offset_vec.size()]);
-		std::copy(m_key_offset_vec.begin(), m_key_offset_vec.end(), key_buffer.get());
-		return BufferTable{
-		    KVKeyBuffer<Key, Trait>{time_stamp, std::move(key_buffer), (size_type)m_key_offset_vec.size()},
-		    KVValueBuffer<Value, Trait>{std::move(m_value_buffer), m_value_buffer_size}};
-	}
-	template <bool Delete, typename Iterator>
-	inline std::optional<BufferTable> Append(const Iterator &it, time_type time_stamp) {
+	template <typename Table, bool Delete, typename Iterator, typename PopFunc>
+	inline std::optional<Table> append(const Iterator &it, PopFunc &&pop_func) {
 		if constexpr (Delete) {
 			if (it.IsKeyDeleted())
 				return std::nullopt;
@@ -158,7 +194,7 @@ public:
 			}
 			return std::nullopt;
 		}
-		auto ret = PopBuffer(time_stamp);
+		Table ret = pop_func();
 		Reset();
 		m_file_size += sizeof(KeyOffset) + value_size;
 		m_key_offset_vec.emplace_back(it.GetKey(), m_value_buffer_size, it.IsKeyDeleted());
@@ -167,7 +203,38 @@ public:
 			it.CopyValueData((char *)m_value_buffer.get());
 			m_value_buffer_size = value_size;
 		}
-		return {std::move(ret)};
+		return std::optional<Table>{std::move(ret)};
+	}
+
+public:
+	inline KVMemAppender() { reset_value_buffer(); }
+	inline void Reset() {
+		m_file_size = kInitialFileSize;
+		m_key_offset_vec.clear();
+		reset_value_buffer();
+	}
+	inline BufferTable PopBuffer() {
+		auto key_buffer = std::unique_ptr<KeyOffset[]>(new KeyOffset[m_key_offset_vec.size()]);
+		std::copy(m_key_offset_vec.begin(), m_key_offset_vec.end(), key_buffer.get());
+		auto ret = BufferTable{KVKeyBuffer<Key, Trait>{std::move(key_buffer), (size_type)m_key_offset_vec.size()},
+		                       KVValueBuffer<Value, Trait>{std::move(m_value_buffer), m_value_buffer_size}};
+		m_value_buffer = nullptr;
+		return ret;
+	}
+	inline FileTable PopFile(FileSystem *p_file_system, level_type level) {
+		auto key_buffer = std::unique_ptr<KeyOffset[]>(new KeyOffset[m_key_offset_vec.size()]);
+		std::copy(m_key_offset_vec.begin(), m_key_offset_vec.end(), key_buffer.get());
+		return FileTable{
+		    p_file_system, KVKeyBuffer<Key, Trait>{std::move(key_buffer), (size_type)m_key_offset_vec.size()},
+		    [this](std::ofstream &fout) { fout.write((const char *)m_value_buffer.get(), m_value_buffer_size); },
+		    m_value_buffer_size, level};
+	}
+	template <bool Delete, typename Iterator> inline std::optional<BufferTable> Append(const Iterator &it) {
+		return append<BufferTable, Delete>(it, [this]() { return PopBuffer(); });
+	}
+	template <bool Delete, typename Iterator>
+	inline std::optional<FileTable> Append(const Iterator &it, FileSystem *p_file_system, level_type level) {
+		return append<FileTable, Delete>(it, [this, p_file_system, level]() { return PopFile(p_file_system, level); });
 	}
 	inline bool IsEmpty() const { return m_key_offset_vec.empty(); }
 };

@@ -26,14 +26,12 @@ protected:
 	using KeyOffset = KVKeyOffset<Key>;
 	using Compare = typename Trait::Compare;
 
-	time_type m_time_stamp{};
 	size_type m_count{};
 	Key m_min, m_max;
 
 	std::unique_ptr<KeyOffset[]> m_keys;
 
 public:
-	inline time_type GetTimeStamp() const { return m_time_stamp; }
 	inline size_type GetCount() const { return m_count; }
 	inline Key GetMin() const { return m_min; }
 	inline Key GetMax() const { return m_max; }
@@ -72,10 +70,9 @@ private:
 
 public:
 	inline KVKeyBuffer() = default;
-	inline KVKeyBuffer(time_type time_stamp, std::unique_ptr<KeyOffset[]> &&keys, size_type count) {
+	inline KVKeyBuffer(std::unique_ptr<KeyOffset[]> &&keys, size_type count) {
 		Base::m_min = keys[0].GetKey();
 		Base::m_max = keys[count - 1].GetKey();
-		Base::m_time_stamp = time_stamp;
 		Base::m_keys = std::move(keys);
 		Base::m_count = count;
 	}
@@ -98,7 +95,6 @@ public:
 	inline explicit KVKeyFile(KVKeyBuffer<Key, Trait> &&key_buffer) {
 		Base::m_min = key_buffer.GetMin();
 		Base::m_max = key_buffer.GetMax();
-		Base::m_time_stamp = key_buffer.GetTimeStamp();
 		Base::m_keys = std::move(key_buffer.m_keys);
 		Base::m_count = key_buffer.GetCount();
 		for (size_type i = 0; i < Base::m_count; ++i)
@@ -111,11 +107,10 @@ public:
 
 template <typename Key, typename Trait> struct IO<KVKeyFile<Key, Trait>> {
 	inline static constexpr size_type GetSize(const KVKeyFile<Key, Trait> &keys) {
-		return sizeof(time_type) + sizeof(size_type) + sizeof(Key) * 2 + IO<typename Trait::Bloom>::GetSize({}) +
+		return sizeof(size_type) + sizeof(Key) * 2 + IO<typename Trait::Bloom>::GetSize({}) +
 		       sizeof(KVKeyOffset<Key>) * keys.GetCount();
 	}
 	template <typename Stream> inline static void Write(Stream &ostr, const KVKeyFile<Key, Trait> &keys) {
-		IO<time_type>::Write(ostr, keys.m_time_stamp);
 		IO<size_type>::Write(ostr, keys.m_count);
 		IO<Key>::Write(ostr, keys.m_min);
 		IO<Key>::Write(ostr, keys.m_max);
@@ -124,7 +119,6 @@ template <typename Key, typename Trait> struct IO<KVKeyFile<Key, Trait>> {
 	}
 	template <typename Stream> inline static KVKeyFile<Key, Trait> Read(Stream &istr, size_type = -1) {
 		KVKeyFile<Key, Trait> table = {};
-		table.m_time_stamp = IO<time_type>::Read(istr);
 		table.m_count = IO<size_type>::Read(istr);
 		table.m_min = IO<Key>::Read(istr);
 		table.m_max = IO<Key>::Read(istr);
