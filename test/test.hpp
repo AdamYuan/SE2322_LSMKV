@@ -42,7 +42,7 @@ struct SnappyStringIO {
 		compressed.resize(length);
 		istr.read(compressed.data(), length);
 		snappy::Uncompress(compressed.data(), length, &str);
-		return str;
+		return std::move(str);
 	}
 };
 
@@ -78,7 +78,7 @@ template <typename Key, typename Value> struct MyTrait {
 	using Compare = std::less<Key>;
 	using SkipList = lsm::SkipList<Key, lsm::KVSkipListValue<Value>, Compare, std::default_random_engine, 1, 2, 64>;
 	using Bloom = lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>;
-	using ValueIO = LZ4StringIO<4000>;
+	using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
 	constexpr static lsm::level_type kLevels = 5;
