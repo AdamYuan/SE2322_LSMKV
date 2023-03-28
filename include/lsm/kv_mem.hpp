@@ -26,38 +26,40 @@ private:
 
 	template <typename Table, typename PopFunc>
 	inline std::optional<Table> put(Key key, Value &&value, PopFunc &&pop_func) {
-		if (m_skiplist.Replace(key, [this, &value](std::optional<Value> *p_opt_value, bool exists) -> bool {
-			    size_type new_size = m_file_size;
-			    if (exists) {
-				    new_size -= p_opt_value->has_value() ? ValueIO::GetSize(p_opt_value->value()) : 0;
-				    new_size += ValueIO::GetSize(value);
-			    } else
-				    new_size += sizeof(KeyOffset) + ValueIO::GetSize(value);
-			    if (m_file_size != kInitialFileSize && new_size > kMaxFileSize)
-				    return false;
-			    *p_opt_value = std::move(value);
-			    m_file_size = new_size;
-			    return true;
-		    }))
+		size_type value_size = ValueIO::GetSize(value);
+		if (m_skiplist.Replace(key,
+		                       [this, &value, value_size](KVSkipListValue<Value> *p_sl_value, bool exists) -> bool {
+			                       size_type new_size = m_file_size;
+			                       if (exists) {
+				                       new_size -= p_sl_value->GetSize();
+				                       new_size += value_size;
+			                       } else
+				                       new_size += sizeof(KeyOffset) + value_size;
+			                       if (m_file_size != kInitialFileSize && new_size > kMaxFileSize)
+				                       return false;
+			                       *p_sl_value = {std::move(value), value_size};
+			                       m_file_size = new_size;
+			                       return true;
+		                       }))
 			return std::nullopt;
 
 		Table ret = pop_func();
 		Reset();
-		m_file_size += sizeof(KeyOffset) + ValueIO::GetSize(value);
-		m_skiplist.Insert(key, std::optional<Value>{std::move(value)});
+		m_file_size += sizeof(KeyOffset) + value_size;
+		m_skiplist.Insert(key, {std::move(value), value_size});
 		return std::optional<Table>{std::move(ret)};
 	}
 
 	template <typename Table, typename PopFunc> inline std::optional<Table> del(Key key, PopFunc &&pop_func) {
-		if (m_skiplist.Replace(key, [this](std::optional<Value> *p_opt_value, bool exists) -> bool {
+		if (m_skiplist.Replace(key, [this](KVSkipListValue<Value> *p_sl_value, bool exists) -> bool {
 			    size_type new_size = m_file_size;
 			    if (exists)
-				    new_size -= p_opt_value->has_value() ? ValueIO::GetSize(p_opt_value->value()) : 0;
+				    new_size -= p_sl_value->GetSize();
 			    else
 				    new_size += sizeof(KeyOffset);
 			    if (m_file_size != kInitialFileSize && new_size > kMaxFileSize)
 				    return false;
-			    *p_opt_value = std::nullopt;
+			    *p_sl_value = {};
 			    m_file_size = new_size;
 			    return true;
 		    }))
@@ -66,7 +68,7 @@ private:
 		Table ret = pop_func();
 		Reset();
 		m_file_size += sizeof(KeyOffset);
-		m_skiplist.Insert(key, std::nullopt);
+		m_skiplist.Insert(key, {});
 		return std::optional<Table>{std::move(ret)};
 	}
 
@@ -84,10 +86,10 @@ public:
 
 		size_type key_id = 0;
 		m_skiplist.ForEach(
-		    [&key_buffer, &key_id, &value_stream](const Key &key, const std::optional<Value> &value_opt) {
-			    key_buffer[key_id++] = KeyOffset{key, value_stream.pos, !value_opt.has_value()};
-			    if (value_opt.has_value())
-				    ValueIO::Write(value_stream, value_opt.value());
+		    [&key_buffer, &key_id, &value_stream](const Key &key, const KVSkipListValue<Value> &sl_value) {
+			    key_buffer[key_id++] = KeyOffset{key, value_stream.pos, sl_value.IsDeleted()};
+			    if (!sl_value.IsDeleted())
+				    ValueIO::Write(value_stream, sl_value.GetValue());
 		    });
 
 		return BufferTable{KVKeyBuffer<Key, Trait>{std::move(key_buffer), m_skiplist.GetSize()},
@@ -101,17 +103,16 @@ public:
 		{
 			size_type key_id = 0, value_pos = 0;
 			m_skiplist.ForEach(
-			    [&key_buffer, &key_id, &value_pos](const Key &key, const std::optional<Value> &value_opt) {
-				    key_buffer[key_id++] = KeyOffset{key, value_pos, !value_opt.has_value()};
-				    if (value_opt.has_value())
-					    value_pos += ValueIO::GetSize(value_opt.value());
+			    [&key_buffer, &key_id, &value_pos](const Key &key, const KVSkipListValue<Value> &sl_value) {
+				    key_buffer[key_id++] = KeyOffset{key, value_pos, sl_value.IsDeleted()};
+				    value_pos += sl_value.GetSize();
 			    });
 		}
 
 		const auto value_writer = [this](std::ofstream &stream) {
-			m_skiplist.ForEach([&stream](const Key &key, const std::optional<Value> &value_opt) {
-				if (value_opt.has_value())
-					ValueIO::Write(stream, value_opt.value());
+			m_skiplist.ForEach([&stream](const Key &key, const KVSkipListValue<Value> &sl_value) {
+				if (!sl_value.IsDeleted())
+					ValueIO::Write(stream, sl_value.GetValue());
 			});
 		};
 
@@ -141,7 +142,7 @@ public:
 	template <typename Func> inline void Scan(Key min_key, Key max_key, Func &&func) const {
 		m_skiplist.Scan(min_key, max_key, std::forward<Func>(func));
 	}
-	inline std::optional<std::optional<Value>> Get(Key key) const { return m_skiplist.Search(key); }
+	inline std::optional<KVSkipListValue<Value>> Get(Key key) const { return m_skiplist.Search(key); }
 	inline bool IsEmpty() const { return m_skiplist.IsEmpty(); }
 };
 

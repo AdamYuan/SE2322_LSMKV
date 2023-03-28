@@ -141,9 +141,9 @@ public:
 	inline void Put(Key key, const Value &value) { Put(key, Value{value}); }
 
 	inline std::optional<Value> Get(Key key) const {
-		auto opt_opt_value = m_mem_skiplist.Get(key);
-		if (opt_opt_value.has_value())
-			return opt_opt_value.value();
+		auto opt_sl_value = m_mem_skiplist.Get(key);
+		if (opt_sl_value.has_value())
+			return opt_sl_value.value().GetOptValue();
 
 		for (const auto &level_vec : m_levels) {
 			for (size_type i = level_vec.size() - 1; ~i; --i) {
@@ -168,7 +168,7 @@ public:
 						iterators.push_back(table.GetLowerBound(min_key));
 			iterator_heap = KVTableIteratorHeap<typename FileTable::Iterator>{std::move(iterators)};
 		}
-		m_mem_skiplist.Scan(min_key, max_key, [&iterator_heap, &func](Key key, const std::optional<Value> &opt_value) {
+		m_mem_skiplist.Scan(min_key, max_key, [&iterator_heap, &func](Key key, const KVSkipListValue<Value> &sl_value) {
 			while (!iterator_heap.IsEmpty() && Compare{}(iterator_heap.GetTop().GetKey(), key)) {
 				const auto &it = iterator_heap.GetTop();
 				if (!it.IsKeyDeleted())
@@ -177,8 +177,8 @@ public:
 			}
 			if (!iterator_heap.IsEmpty() && !Compare{}(key, iterator_heap.GetTop().GetKey()))
 				iterator_heap.Proceed();
-			if (opt_value.has_value())
-				func(key, opt_value.value());
+			if (!sl_value.IsDeleted())
+				func(key, sl_value.GetValue());
 		});
 		while (!iterator_heap.IsEmpty() && !Compare{}(max_key, iterator_heap.GetTop().GetKey())) {
 			const auto &it = iterator_heap.GetTop();
@@ -192,7 +192,7 @@ public:
 		// Check whether the key is already deleted
 		auto opt_opt_value = m_mem_skiplist.Get(key);
 		if (opt_opt_value.has_value()) {
-			if (!opt_opt_value.value().has_value())
+			if (opt_opt_value.value().IsDeleted())
 				return false;
 		} else {
 			for (const auto &level_vec : m_levels) {

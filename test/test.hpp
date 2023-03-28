@@ -7,6 +7,8 @@
 #include <lsm/kv.hpp>
 
 #include "MurmurHash3.h"
+#include <snappy.h>
+
 template <typename Key> struct Murmur3BloomHasher {
 	template <std::size_t Bits, typename Array> inline static void Insert(Array &array, const Key &key) {
 		uint32_t hashes[4];
@@ -23,11 +25,31 @@ template <typename Key> struct Murmur3BloomHasher {
 	}
 };
 
+struct CompressedStringIO {
+	inline static lsm::size_type GetSize(const std::string &str) {
+		std::string compressed;
+		snappy::Compress(str.data(), str.length(), &compressed);
+		return compressed.length();
+	}
+	template <typename Stream> inline static void Write(Stream &ostr, const std::string &str) {
+		std::string compressed;
+		snappy::Compress(str.data(), str.length(), &compressed);
+		ostr.write(compressed.data(), compressed.length());
+	}
+	template <typename Stream> inline static std::string Read(Stream &istr, lsm::size_type length) {
+		std::string compressed, str;
+		compressed.resize(length);
+		istr.read(compressed.data(), length);
+		snappy::Uncompress(compressed.data(), length, &str);
+		return str;
+	}
+};
+
 template <typename Key, typename Value> struct MyTrait {
 	using Compare = std::less<Key>;
-	using SkipList = lsm::SkipList<Key, std::optional<Value>, Compare, std::default_random_engine, 1, 2, 64>;
+	using SkipList = lsm::SkipList<Key, lsm::KVSkipListValue<Value>, Compare, std::default_random_engine, 1, 2, 64>;
 	using Bloom = lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>;
-	using ValueIO = lsm::IO<Value>;
+	using ValueIO = CompressedStringIO;
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
 	constexpr static lsm::level_type kLevels = 5;
