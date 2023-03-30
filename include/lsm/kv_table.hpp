@@ -139,39 +139,31 @@ public:
 	inline KVFileTable(FileSystem *p_file_system, KVBufferTable<Key, Value, Trait> &&buffer, level_type level)
 	    : m_level{level}, m_time_stamp{p_file_system->GetTimeStamp()} {
 		Base::m_keys = KeyFile{std::move(buffer.m_keys)};
-		auto file_path = p_file_system->GetFilePath(level);
-		{
-			std::ofstream fout = p_file_system->AllocOutputStream(file_path);
-			IO<time_type>::Write(fout, m_time_stamp);
+		auto [time_stamp, file_path] = p_file_system->CreateFile(level, [this, &buffer](std::ofstream &fout) {
 			IO<KeyFile>::Write(fout, Base::m_keys);
 			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
-		}
+		});
+		m_time_stamp = time_stamp;
 		Base::m_values =
 		    ValueFile{p_file_system, file_path, IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type),
 		              buffer.m_values.GetSize()};
-
-		p_file_system->NextTimeStamp();
 	}
 	template <typename ValueWriter>
 	inline KVFileTable(FileSystem *p_file_system, KVKeyBuffer<Key, Trait> &&key_buffer, ValueWriter &&value_writer,
 	                   size_type value_size, level_type level)
-	    : m_level{level}, m_time_stamp{p_file_system->GetTimeStamp()} {
+	    : m_level{level} {
 		Base::m_keys = KeyFile{std::move(key_buffer)};
-		auto file_path = p_file_system->GetFilePath(level);
-		{
-			std::ofstream fout = p_file_system->AllocOutputStream(file_path);
-			IO<time_type>::Write(fout, m_time_stamp);
+		auto [time_stamp, file_path] = p_file_system->CreateFile(level, [this, &value_writer](std::ofstream &fout) {
 			IO<KeyFile>::Write(fout, Base::m_keys);
 			value_writer(fout);
-		}
+		});
+		m_time_stamp = time_stamp;
 		Base::m_values = ValueFile{p_file_system, file_path,
 		                           IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type), value_size};
-
-		p_file_system->NextTimeStamp();
 	}
 	inline explicit KVFileTable(FileSystem *p_file_system, const std::filesystem::path &file_path, level_type level)
 	    : m_level{level} {
-		std::ifstream &fin = p_file_system->GetInputStream(file_path);
+		std::ifstream &fin = p_file_system->GetFileStream(file_path);
 		fin.seekg(0);
 		m_time_stamp = IO<time_type>::Read(fin);
 		Base::m_keys = IO<KeyFile>::Read(fin);

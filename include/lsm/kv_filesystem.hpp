@@ -15,12 +15,15 @@ private:
 	std::filesystem::path m_directory;
 	time_type m_time_stamp;
 
+	inline std::filesystem::path get_level_dir(level_type level) const {
+		return m_directory / (std::string{"level-"} + std::to_string(level));
+	}
 	inline void init_directory() {
 		if (!std::filesystem::exists(m_directory))
 			std::filesystem::create_directory(m_directory);
 		for (level_type level = 0; level <= kLevels; ++level) {
-			if (!std::filesystem::exists(GetLevelDirectory(level)))
-				std::filesystem::create_directory(GetLevelDirectory(level));
+			if (!std::filesystem::exists(get_level_dir(level)))
+				std::filesystem::create_directory(get_level_dir(level));
 		}
 	}
 
@@ -51,24 +54,19 @@ public:
 	}
 
 	inline void MaintainTimeStamp(time_type time_stamp) { m_time_stamp = std::max(time_stamp + 1, m_time_stamp); }
-	inline void NextTimeStamp() { ++m_time_stamp; }
 
-	inline std::filesystem::path GetLevelDirectory(level_type level) const {
-		return m_directory / (std::string{"level-"} + std::to_string(level));
-	}
-	inline std::filesystem::path GetFilePath(level_type level) const {
-		return GetLevelDirectory(level) / (std::to_string(m_time_stamp) + ".sst");
-	}
-	inline time_type GetTimeStamp() const { return m_time_stamp; }
-
-	inline std::ifstream &GetInputStream(const std::filesystem::path &file_path) const {
+	inline std::ifstream &GetFileStream(const std::filesystem::path &file_path) const {
 		return m_input_stream_cache.Push(file_path, [](const std::filesystem::path &path) {
 			return std::ifstream{path, std::ios::binary};
 		});
 	}
-
-	inline std::ofstream AllocOutputStream(const std::filesystem::path &file_path) const {
-		return std::ofstream{file_path, std::ios::binary};
+	template <typename Writer>
+	inline std::tuple<time_type, std::filesystem::path> CreateFile(level_type level, Writer &&writer) {
+		std::filesystem::path file_path = get_level_dir(level) / (std::to_string(m_time_stamp) + ".sst");
+		std::ofstream fout{file_path, std::ios::binary};
+		IO<time_type>::Write(fout, m_time_stamp);
+		writer(fout);
+		return {m_time_stamp++, file_path};
 	}
 
 	inline void Reset() {
