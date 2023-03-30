@@ -112,7 +112,7 @@ private:
 	template <typename, typename, typename> friend class KVFileTable;
 
 public:
-	inline static bool IsPrior(const KVBufferTable &) { return true; }
+	inline static bool IsPrior(const KVBufferTable &) { return false; }
 	inline KVBufferTable(KeyBuffer &&keys, ValueBuffer &&values) {
 		Base::m_keys = std::move(keys);
 		Base::m_values = std::move(values);
