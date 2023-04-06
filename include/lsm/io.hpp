@@ -36,11 +36,4 @@ template <> struct IO<std::string> {
 	}
 };
 
-template <typename Key> class IFStreamCache {
-private:
-	std::unordered_map<Key, size_type> m_lookup_map;
-
-public:
-};
-
 } // namespace lsm
