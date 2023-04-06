@@ -54,6 +54,8 @@ private:
 		}
 	};
 
+	template <typename> friend struct IO;
+
 public:
 	inline bool operator[](size_type idx) const { return m_bits[idx >> 6u] & (1ULL << (idx & 63ULL)); }
 	inline Wrapper operator[](size_type idx) { return {m_bits[idx >> 6u], idx & 63u}; }
@@ -61,6 +63,18 @@ public:
 	inline Bloom() = default;
 	inline void Insert(const Key &key) { Hasher::template Insert<Bits>(*this, key); }
 	inline bool Exist(const Key &key) const { return Hasher::template Exist<Bits>(*this, key); }
+};
+
+template <typename Key, size_type Bits, typename Hasher> struct IO<Bloom<Key, Bits, Hasher>> {
+	inline static constexpr size_type GetSize(const Bloom<Key, Bits, Hasher> &bloom) { return sizeof(bloom.m_bits); }
+	template <typename Stream> inline static void Write(Stream &ostr, const Bloom<Key, Bits, Hasher> &bloom) {
+		ostr.write((const char *)bloom.m_bits, sizeof(bloom.m_bits));
+	}
+	template <typename Stream> inline static Bloom<Key, Bits, Hasher> Read(Stream &istr, size_type = 0) {
+		Bloom<Key, Bits, Hasher> bloom;
+		istr.read((char *)bloom.m_bits, sizeof(bloom.m_bits));
+		return bloom;
+	}
 };
 
 } // namespace lsm
