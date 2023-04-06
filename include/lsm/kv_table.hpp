@@ -163,8 +163,7 @@ public:
 	}
 	inline explicit KVFileTable(FileSystem *p_file_system, const std::filesystem::path &file_path, level_type level)
 	    : m_level{level} {
-		std::ifstream &fin = p_file_system->GetFileStream(file_path);
-		fin.seekg(0);
+		std::ifstream &fin = p_file_system->GetFileStream(file_path, 0);
 		m_time_stamp = IO<time_type>::Read(fin);
 		Base::m_keys = IO<KeyFile>::Read(fin);
 		size_type value_offset = IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type);

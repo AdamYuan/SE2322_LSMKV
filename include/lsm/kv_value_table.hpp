@@ -51,14 +51,10 @@ public:
 
 	inline size_type GetSize() const { return m_size; }
 	inline Value Read(size_type begin, size_type len) const {
-		std::ifstream &fin = m_p_file_system->GetFileStream(m_file_path);
-		fin.seekg(m_offset + begin);
-		return ValueIO::Read(fin, len);
+		return ValueIO::Read(m_p_file_system->GetFileStream(m_file_path, m_offset + begin), len);
 	}
 	inline void CopyData(size_type begin, size_type len, char *dst) const {
-		std::ifstream &fin = m_p_file_system->GetFileStream(m_file_path);
-		fin.seekg(m_offset + begin);
-		fin.read(dst, len);
+		m_p_file_system->GetFileStream(m_file_path, m_offset + begin).read(dst, len);
 	}
 };
 

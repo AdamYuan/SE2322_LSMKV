@@ -55,10 +55,11 @@ public:
 
 	inline void MaintainTimeStamp(time_type time_stamp) { m_time_stamp = std::max(time_stamp + 1, m_time_stamp); }
 
-	inline std::ifstream &GetFileStream(const std::filesystem::path &file_path) const {
-		return m_input_stream_cache.Push(file_path, [](const std::filesystem::path &path) {
+	inline std::ifstream &GetFileStream(const std::filesystem::path &file_path, size_type pos) const {
+		std::ifstream &ret = m_input_stream_cache.Push(file_path, [](const std::filesystem::path &path) {
 			return std::ifstream{path, std::ios::binary};
 		});
+		return ret.seekg(pos), ret;
 	}
 	template <typename Writer>
 	inline std::tuple<time_type, std::filesystem::path> CreateFile(level_type level, Writer &&writer) {
