@@ -32,13 +32,15 @@ protected:
 	std::unique_ptr<KeyOffset[]> m_keys;
 
 public:
+	using Index = const KeyOffset *;
+
 	inline size_type GetCount() const { return m_count; }
 	inline Key GetMin() const { return m_min; }
 	inline Key GetMax() const { return m_max; }
 	inline virtual bool IsExcluded(Key key) const { return false; }
-	inline const KeyOffset *GetBegin() const { return m_keys.get(); }
-	inline const KeyOffset *GetEnd() const { return m_keys.get() + m_count; }
-	inline const KeyOffset *GetLowerBound(Key key) const {
+	inline Index GetBegin() const { return m_keys.get(); }
+	inline Index GetEnd() const { return m_keys.get() + m_count; }
+	inline Index GetLowerBound(Key key) const {
 		const KeyOffset *first = GetBegin(), *key_it;
 		size_type count = m_count, step;
 		while (count > 0) {
@@ -52,12 +54,13 @@ public:
 		}
 		return key_it;
 	}
-	inline const KeyOffset *Find(Key key) const {
+	inline Index Find(Key key) const {
 		if (IsExcluded(key))
 			return GetEnd();
 		const KeyOffset *key_it = GetLowerBound(key);
 		return Compare{}(key_it->GetKey(), key) || Compare{}(key, key_it->GetKey()) ? GetEnd() : key_it;
 	}
+	inline static KeyOffset GetKeyOffset(Index index) { return *index; }
 };
 
 template <typename Key, typename Trait> class KVKeyBuffer final : public KVKeyTableBase<Key, Trait> {

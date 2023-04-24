@@ -12,26 +12,29 @@ namespace lsm {
 
 template <typename Key, typename Value, typename Trait, typename Table> class KVTableIterator {
 private:
+	using KeyIndex = typename decltype((const Table *) {} -> m_keys)::Index;
 	const Table *m_p_table;
-	const KVKeyOffset<Key> *m_p_key_offset;
+	KeyIndex m_key_index;
+
+	inline KVKeyOffset<Key> get_key_offset(KeyIndex index) const { return m_p_table->m_keys.GetKeyOffset(index); }
+	inline KVKeyOffset<Key> cur_key_offset() const { return get_key_offset(m_key_index); }
 
 public:
-	inline KVTableIterator(const Table *p_table, const KVKeyOffset<Key> *p_key_offset)
-	    : m_p_table{p_table}, m_p_key_offset{p_key_offset} {}
+	inline KVTableIterator(const Table *p_table, KeyIndex key_index) : m_p_table{p_table}, m_key_index{key_index} {}
 	inline const Table &GetTable() const { return *m_p_table; }
-	inline bool IsValid() const { return m_p_key_offset != m_p_table->m_keys.GetEnd(); }
-	inline bool IsKeyDeleted() const { return m_p_key_offset->IsDeleted(); }
-	inline Key GetKey() const { return m_p_key_offset->GetKey(); }
+	inline bool IsValid() const { return m_key_index != m_p_table->m_keys.GetEnd(); }
+	inline bool IsKeyDeleted() const { return cur_key_offset().IsDeleted(); }
+	inline Key GetKey() const { return cur_key_offset().GetKey(); }
 	inline size_type GetValueSize() const {
-		const KVKeyOffset<Key> *p_nxt = m_p_key_offset + 1;
-		return (p_nxt == m_p_table->m_keys.GetEnd() ? m_p_table->m_values.GetSize() : p_nxt->GetOffset()) -
-		       m_p_key_offset->GetOffset();
+		KeyIndex nxt = m_key_index + 1;
+		return (nxt == m_p_table->m_keys.GetEnd() ? m_p_table->m_values.GetSize() : get_key_offset(nxt).GetOffset()) -
+		       cur_key_offset().GetOffset();
 	}
-	inline Value ReadValue() const { return m_p_table->m_values.Read(m_p_key_offset->GetOffset(), GetValueSize()); }
+	inline Value ReadValue() const { return m_p_table->m_values.Read(cur_key_offset().GetOffset(), GetValueSize()); }
 	inline void CopyValueData(char *dst) const {
-		m_p_table->m_values.CopyData(m_p_key_offset->GetOffset(), GetValueSize(), dst);
+		m_p_table->m_values.CopyData(cur_key_offset().GetOffset(), GetValueSize(), dst);
 	}
-	inline void Proceed() { ++m_p_key_offset; }
+	inline void Proceed() { ++m_key_index; }
 };
 
 template <typename Iterator> class KVTableIteratorHeap;
