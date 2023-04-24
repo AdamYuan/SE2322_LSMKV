@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kv_appender.hpp"
 #include "kv_mem.hpp"
 #include "kv_table.hpp"
 
@@ -48,8 +49,8 @@ private:
 public:
 	inline KVMerger(std::vector<FileTable> &&file_tables, std::vector<BufferTable> &&buffer_tables,
 	                FileSystem *p_file_system)
-	    : m_p_file_system{p_file_system}, m_file_tables{std::move(file_tables)}, m_buffer_tables{
-	                                                                                 std::move(buffer_tables)} {
+	    : m_p_file_system{p_file_system}, m_file_tables{std::move(file_tables)},
+	      m_buffer_tables{std::move(buffer_tables)} {
 
 		m_result_tables.reserve(m_file_tables.size() + m_buffer_tables.size());
 
@@ -106,4 +107,4 @@ public:
 	}
 };
 
-} // namespace lsm
+} // namespace lsm::detail

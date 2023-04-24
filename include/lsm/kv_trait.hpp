@@ -9,14 +9,18 @@
 
 namespace lsm {
 
-template <typename Type> using IO = detail::IO<Type>;
-template <typename Key, typename Trait, typename Bloom> using KVKeyFile = detail::KVKeyFile<Key, Trait, Bloom>;
+template <typename Key, typename Trait> using KVUncachedKeyFile = detail::KVUncachedKeyFile<Key, Trait>;
+template <typename Key, typename Trait, typename Bloom>
+using KVUncachedBloomKeyFile = detail::KVUncachedBloomKeyFile<Key, Trait, Bloom>;
+template <typename Key, typename Trait> using KVCachedKeyFile = detail::KVCachedKeyFile<Key, Trait>;
+template <typename Key, typename Trait, typename Bloom>
+using KVCachedBloomKeyFile = detail::KVCachedBloomKeyFile<Key, Trait, Bloom>;
 
 template <typename Key, typename Value, typename CompareType = std::less<Key>> struct KVDefaultTrait {
 	using Compare = CompareType;
-	using SkipList = lsm::SkipList<Key, KVSkipListValue<Value>, Compare, std::default_random_engine, 1, 2, 64>;
-	using KeyFile = lsm::KVKeyFile<Key, KVDefaultTrait, Bloom<Key, 10240 * 8>>;
-	using ValueIO = IO<Value>;
+	using SkipList = lsm::SkipList<Key, KVMemValue<Value>, Compare, std::default_random_engine, 1, 2, 64>;
+	using KeyFile = lsm::KVCachedBloomKeyFile<Key, KVDefaultTrait, Bloom<Key, 10240 * 8>>;
+	using ValueIO = detail::IO<Value>;
 	constexpr static size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
 	constexpr static level_type kLevels = 5;

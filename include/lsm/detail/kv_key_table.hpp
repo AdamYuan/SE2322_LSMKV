@@ -1,8 +1,11 @@
 #pragma once
 
+#include <utility>
+
 #include "../bloom.hpp"
 #include "../type.hpp"
 #include "io.hpp"
+#include "kv_filesystem.hpp"
 
 namespace lsm::detail {
 
@@ -25,7 +28,7 @@ public:
 template <typename Key> class KVKeyTableBase {
 protected:
 	size_type m_count{};
-	Key m_min, m_max;
+	Key m_min{}, m_max{};
 
 public:
 	inline KVKeyTableBase() = default;
@@ -36,10 +39,10 @@ public:
 	inline Key GetMax() const { return m_max; }
 };
 
-template <typename Derived, typename Key, typename Compare> class KVCachedKeyTableBase : public KVKeyTableBase<Key> {
+template <typename Derived, typename Key, typename Trait> class KVCachedKeyTableBase : public KVKeyTableBase<Key> {
 protected:
+	using Compare = typename Trait::Compare;
 	using KeyOffset = KVKeyOffset<Key>;
-	using Base = KVKeyTableBase<Key>;
 
 	std::unique_ptr<KeyOffset[]> m_keys;
 
@@ -48,15 +51,15 @@ public:
 
 	inline KVCachedKeyTableBase() = default;
 	inline KVCachedKeyTableBase(std::unique_ptr<KeyOffset[]> &&keys, size_type count)
-	    : Base(keys[0].GetKey(), keys[count - 1].GetKey(), count) {
+	    : KVKeyTableBase<Key>(keys[0].GetKey(), keys[count - 1].GetKey(), count) {
 		m_keys = std::move(keys);
 	}
 
 	inline Index GetBegin() const { return m_keys.get(); }
-	inline Index GetEnd() const { return m_keys.get() + Base::m_count; }
+	inline Index GetEnd() const { return m_keys.get() + this->m_count; }
 	inline Index GetLowerBound(Key key) const {
 		const KeyOffset *first = GetBegin(), *key_it;
-		size_type count = Base::m_count, step;
+		size_type count = this->m_count, step;
 		while (count > 0) {
 			step = count >> 1u;
 			key_it = first + step;
@@ -77,14 +80,62 @@ public:
 	inline static KeyOffset GetKeyOffset(Index index) { return *index; }
 };
 
+template <typename Derived, typename Key, typename Trait> class KVUncachedKeyTableBase : public KVKeyTableBase<Key> {
+protected:
+	using Compare = typename Trait::Compare;
+	using KeyOffset = KVKeyOffset<Key>;
+
+	KVFileSystem<Trait> *m_p_file_system{};
+	std::filesystem::path m_file_path;
+
+public:
+	using Index = size_type;
+
+	inline KVUncachedKeyTableBase() = default;
+	inline KVUncachedKeyTableBase(KVFileSystem<Trait> *p_file_system, std::filesystem::path file_path)
+	    : m_p_file_system{p_file_system}, m_file_path{std::move(file_path)} {}
+	inline KVUncachedKeyTableBase(KVFileSystem<Trait> *p_file_system, std::filesystem::path file_path, Key min, Key max,
+	                              size_type count)
+	    : KVKeyTableBase<Key>(min, max, count), m_p_file_system{p_file_system}, m_file_path{std::move(file_path)} {}
+
+	inline Index GetBegin() const { return 0; }
+	inline Index GetEnd() const { return this->m_count; }
+	inline Index GetLowerBound(Key key) const {
+		std::ifstream &fin = m_p_file_system->GetFileStream(m_file_path, sizeof(time_type) + Derived::GetHeaderSize());
+		for (Index i = 0; i < this->m_count; ++i) {
+			KeyOffset key_offset = IO<KeyOffset>::Read(fin);
+			if (!Compare{}(key_offset.GetKey(), key))
+				return i;
+		}
+		return this->m_count;
+	}
+	inline Index Find(Key key) const {
+		std::ifstream &fin = m_p_file_system->GetFileStream(m_file_path, sizeof(time_type) + Derived::GetHeaderSize());
+		for (Index i = 0; i < this->m_count; ++i) {
+			KeyOffset key_offset = IO<KeyOffset>::Read(fin);
+			if (!Compare{}(key_offset.GetKey(), key))
+				return Compare{}(key, key_offset.GetKey()) ? this->m_count : i;
+		}
+		return this->m_count;
+	}
+	inline KeyOffset GetKeyOffset(Index index) const {
+		// TODO: Cache it
+		return IO<KeyOffset>::Read(m_p_file_system->GetFileStream(
+		    m_file_path, sizeof(time_type) + Derived::GetHeaderSize() + index * (sizeof(KeyOffset))));
+	}
+};
+
 template <typename Key, typename Trait>
-class KVKeyBuffer final : public KVCachedKeyTableBase<KVKeyBuffer<Key, Trait>, Key, typename Trait::Compare> {
+class KVKeyBuffer final : public KVCachedKeyTableBase<KVKeyBuffer<Key, Trait>, Key, Trait> {
 private:
 	using KeyOffset = KVKeyOffset<Key>;
 	using Compare = typename Trait::Compare;
-	using Base = KVCachedKeyTableBase<KVKeyBuffer, Key, Compare>;
+	using Base = KVCachedKeyTableBase<KVKeyBuffer, Key, Trait>;
 
-	template <typename, typename, typename> friend class KVKeyFile;
+	template <typename, typename, typename> friend class KVCachedBloomKeyFile;
+	template <typename, typename> friend class KVCachedKeyFile;
+	template <typename, typename, typename> friend class KVUncachedBloomKeyFile;
+	template <typename, typename> friend class KVUncachedKeyFile;
 
 public:
 	inline KVKeyBuffer() = default;
@@ -92,51 +143,158 @@ public:
 	inline bool IsExcluded(Key key) const { return Compare{}(key, Base::GetMin()) || Compare{}(Base::GetMax(), key); }
 };
 
-template <typename Key, typename Trait, typename Bloom>
-class KVKeyFile final : public KVCachedKeyTableBase<KVKeyFile<Key, Trait, Bloom>, Key, typename Trait::Compare> {
-private:
-	using Compare = typename Trait::Compare;
-	using Base = KVCachedKeyTableBase<KVKeyFile, Key, Compare>;
-
-	Bloom m_bloom;
-
-	template <typename> friend class IO;
-
+template <typename Derived, typename Key> class KVKeyFileBase {
+protected:
 public:
-	inline KVKeyFile() = default;
-	inline explicit KVKeyFile(KVKeyBuffer<Key, Trait> &&key_buffer)
-	    : Base(std::move(key_buffer.m_keys), key_buffer.GetCount()) {
-		for (size_type i = 0; i < Base::m_count; ++i)
-			m_bloom.Insert(Base::m_keys[i].GetKey());
-	}
-	inline bool IsExcluded(Key key) const {
-		return Compare{}(key, Base::GetMin()) || Compare{}(Base::GetMax(), key) || !m_bloom.Exist(key);
+	inline constexpr size_type GetSize() const {
+		return Derived::GetHeaderSize() + sizeof(KVKeyOffset<Key>) * static_cast<const Derived *>(this)->GetCount();
 	}
 };
 
-template <typename Key, typename Trait, typename Bloom> struct IO<KVKeyFile<Key, Trait, Bloom>> {
-	inline static constexpr size_type GetSize() { return sizeof(size_type) + sizeof(Key) * 2 + IO<Bloom>::GetSize({}); }
-	inline static constexpr size_type GetSize(const KVKeyFile<Key, Trait, Bloom> &keys) {
-		return sizeof(size_type) + sizeof(Key) * 2 + IO<Bloom>::GetSize({}) +
-		       sizeof(KVKeyOffset<Key>) * keys.GetCount();
+template <typename Key, typename Trait>
+class KVUncachedKeyFile final : public KVUncachedKeyTableBase<KVUncachedKeyFile<Key, Trait>, Key, Trait>,
+                                public KVKeyFileBase<KVUncachedKeyFile<Key, Trait>, Key> {
+private:
+	using Compare = typename Trait::Compare;
+
+public:
+	inline KVUncachedKeyFile() = default;
+	template <typename Stream>
+	inline KVUncachedKeyFile(Stream &ostr, KVKeyBuffer<Key, Trait> &&key_buffer, KVFileSystem<Trait> *p_file_system,
+	                         const std::filesystem::path &file_path)
+	    : KVUncachedKeyTableBase<KVUncachedKeyFile, Key, Trait>(p_file_system, file_path, key_buffer.GetMin(),
+	                                                            key_buffer.GetMax(), key_buffer.GetCount()) {
+		IO<size_type>::Write(ostr, this->m_count);
+		IO<Key>::Write(ostr, this->m_min);
+		IO<Key>::Write(ostr, this->m_max);
+		ostr.write((const char *)key_buffer.m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
 	}
-	template <typename Stream> inline static void Write(Stream &ostr, const KVKeyFile<Key, Trait, Bloom> &keys) {
-		IO<size_type>::Write(ostr, keys.m_count);
-		IO<Key>::Write(ostr, keys.m_min);
-		IO<Key>::Write(ostr, keys.m_max);
-		IO<Bloom>::Write(ostr, keys.m_bloom);
-		ostr.write((const char *)keys.m_keys.get(), keys.m_count * sizeof(KVKeyOffset<Key>));
+
+	template <typename Stream>
+	inline KVUncachedKeyFile(Stream &istr, KVFileSystem<Trait> *p_file_system, const std::filesystem::path &file_path)
+	    : KVUncachedKeyTableBase<KVUncachedKeyFile, Key, Trait>(p_file_system, file_path) {
+		this->m_count = IO<size_type>::Read(istr);
+		this->m_min = IO<Key>::Read(istr);
+		this->m_max = IO<Key>::Read(istr);
 	}
-	template <typename Stream> inline static KVKeyFile<Key, Trait, Bloom> Read(Stream &istr, size_type = -1) {
-		KVKeyFile<Key, Trait, Bloom> table = {};
-		table.m_count = IO<size_type>::Read(istr);
-		table.m_min = IO<Key>::Read(istr);
-		table.m_max = IO<Key>::Read(istr);
-		table.m_bloom = IO<Bloom>::Read(istr);
-		table.m_keys = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[table.m_count]);
-		istr.read((char *)table.m_keys.get(), table.m_count * sizeof(KVKeyOffset<Key>));
-		return table;
+
+	inline bool IsExcluded(Key key) const { return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key); }
+	inline static constexpr size_type GetHeaderSize() { return sizeof(size_type) + sizeof(Key) * 2; }
+};
+
+template <typename Key, typename Trait, typename Bloom>
+class KVUncachedBloomKeyFile final
+    : public KVUncachedKeyTableBase<KVUncachedBloomKeyFile<Key, Trait, Bloom>, Key, Trait>,
+      public KVKeyFileBase<KVUncachedBloomKeyFile<Key, Trait, Bloom>, Key> {
+private:
+	using Compare = typename Trait::Compare;
+
+	Bloom m_bloom;
+
+public:
+	inline KVUncachedBloomKeyFile() = default;
+	template <typename Stream>
+	inline KVUncachedBloomKeyFile(Stream &ostr, KVKeyBuffer<Key, Trait> &&key_buffer,
+	                              KVFileSystem<Trait> *p_file_system, const std::filesystem::path &file_path)
+	    : KVUncachedKeyTableBase<KVUncachedBloomKeyFile, Key, Trait>(p_file_system, file_path, key_buffer.GetMin(),
+	                                                                 key_buffer.GetMax(), key_buffer.GetCount()) {
+		for (size_type i = 0; i < this->m_count; ++i)
+			m_bloom.Insert(key_buffer.m_keys[i].GetKey());
+		IO<size_type>::Write(ostr, this->m_count);
+		IO<Key>::Write(ostr, this->m_min);
+		IO<Key>::Write(ostr, this->m_max);
+		IO<Bloom>::Write(ostr, m_bloom);
+		ostr.write((const char *)key_buffer.m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
 	}
+
+	template <typename Stream>
+	inline KVUncachedBloomKeyFile(Stream &istr, KVFileSystem<Trait> *p_file_system,
+	                              const std::filesystem::path &file_path)
+	    : KVUncachedKeyTableBase<KVUncachedBloomKeyFile, Key, Trait>(p_file_system, file_path) {
+		this->m_count = IO<size_type>::Read(istr);
+		this->m_min = IO<Key>::Read(istr);
+		this->m_max = IO<Key>::Read(istr);
+		this->m_bloom = IO<Bloom>::Read(istr);
+	}
+
+	inline bool IsExcluded(Key key) const {
+		return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key) || !m_bloom.Exist(key);
+	}
+	inline static constexpr size_type GetHeaderSize() {
+		return sizeof(size_type) + sizeof(Key) * 2 + IO<Bloom>::GetSize({});
+	}
+};
+
+template <typename Key, typename Trait, typename Bloom>
+class KVCachedBloomKeyFile final : public KVCachedKeyTableBase<KVCachedBloomKeyFile<Key, Trait, Bloom>, Key, Trait>,
+                                   public KVKeyFileBase<KVCachedBloomKeyFile<Key, Trait, Bloom>, Key> {
+private:
+	using Compare = typename Trait::Compare;
+
+	Bloom m_bloom;
+
+public:
+	inline KVCachedBloomKeyFile() = default;
+
+	template <typename Stream>
+	inline KVCachedBloomKeyFile(Stream &ostr, KVKeyBuffer<Key, Trait> &&key_buffer, KVFileSystem<Trait> *,
+	                            const std::filesystem::path &)
+	    : KVCachedKeyTableBase<KVCachedBloomKeyFile, Key, Trait>(std::move(key_buffer.m_keys), key_buffer.GetCount()) {
+		for (size_type i = 0; i < this->m_count; ++i)
+			m_bloom.Insert(this->m_keys[i].GetKey());
+		IO<size_type>::Write(ostr, this->m_count);
+		IO<Key>::Write(ostr, this->m_min);
+		IO<Key>::Write(ostr, this->m_max);
+		IO<Bloom>::Write(ostr, m_bloom);
+		ostr.write((const char *)this->m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
+	}
+	template <typename Stream>
+	inline KVCachedBloomKeyFile(Stream &istr, KVFileSystem<Trait> *, const std::filesystem::path &) {
+		this->m_count = IO<size_type>::Read(istr);
+		this->m_min = IO<Key>::Read(istr);
+		this->m_max = IO<Key>::Read(istr);
+		this->m_bloom = IO<Bloom>::Read(istr);
+		this->m_keys = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[this->m_count]);
+		istr.read((char *)this->m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
+	}
+	inline bool IsExcluded(Key key) const {
+		return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key) || !m_bloom.Exist(key);
+	}
+	inline static constexpr size_type GetHeaderSize() {
+		return sizeof(size_type) + sizeof(Key) * 2 + IO<Bloom>::GetSize({});
+	}
+};
+
+template <typename Key, typename Trait>
+class KVCachedKeyFile final : public KVCachedKeyTableBase<KVCachedKeyFile<Key, Trait>, Key, Trait>,
+                              public KVKeyFileBase<KVCachedKeyFile<Key, Trait>, Key> {
+private:
+	using Compare = typename Trait::Compare;
+
+public:
+	inline KVCachedKeyFile() = default;
+
+	template <typename Stream>
+	inline KVCachedKeyFile(Stream &ostr, KVKeyBuffer<Key, Trait> &&key_buffer, KVFileSystem<Trait> *,
+	                       const std::filesystem::path &)
+	    : KVCachedKeyTableBase<KVCachedKeyFile, Key, Trait>(std::move(key_buffer.m_keys), key_buffer.GetCount()) {
+		IO<size_type>::Write(ostr, this->m_count);
+		IO<Key>::Write(ostr, this->m_min);
+		IO<Key>::Write(ostr, this->m_max);
+		ostr.write((const char *)this->m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
+	}
+
+	template <typename Stream>
+	inline KVCachedKeyFile(Stream &istr, KVFileSystem<Trait> *, const std::filesystem::path &) {
+		this->m_count = IO<size_type>::Read(istr);
+		this->m_min = IO<Key>::Read(istr);
+		this->m_max = IO<Key>::Read(istr);
+		this->m_keys = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[this->m_count]);
+		istr.read((char *)this->m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
+	}
+
+	inline bool IsExcluded(Key key) const { return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key); }
+	inline static constexpr size_type GetHeaderSize() { return sizeof(size_type) + sizeof(Key) * 2; }
 };
 
 } // namespace lsm::detail

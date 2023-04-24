@@ -53,6 +53,8 @@ public:
 		}
 	}
 
+	inline time_type GetTimeStamp() const { return m_time_stamp; }
+
 	inline void MaintainTimeStamp(time_type time_stamp) { m_time_stamp = std::max(time_stamp + 1, m_time_stamp); }
 
 	inline std::ifstream &GetFileStream(const std::filesystem::path &file_path, size_type pos) const {
@@ -61,13 +63,12 @@ public:
 		});
 		return ret.seekg(pos), ret;
 	}
-	template <typename Writer>
-	inline std::tuple<time_type, std::filesystem::path> CreateFile(level_type level, Writer &&writer) {
+	template <typename Writer> inline void CreateFile(level_type level, Writer &&writer) {
 		std::filesystem::path file_path = get_level_dir(level) / (std::to_string(m_time_stamp) + ".sst");
 		std::ofstream fout{file_path, std::ios::binary};
 		IO<time_type>::Write(fout, m_time_stamp);
-		writer(fout);
-		return {m_time_stamp++, file_path};
+		writer(fout, std::move(file_path));
+		++m_time_stamp;
 	}
 
 	inline void Reset() {
@@ -79,4 +80,4 @@ public:
 	}
 };
 
-} // namespace lsm
+} // namespace lsm::detail

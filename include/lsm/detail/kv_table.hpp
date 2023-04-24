@@ -127,7 +127,6 @@ template <typename Key, typename Value, typename Trait>
 class KVFileTable final : public KVTableBase<KVFileTable<Key, Value, Trait>, Key, Value, Trait, typename Trait::KeyFile,
                                              KVValueFile<Value, Trait>> {
 private:
-	using Base = KVTableBase<KVFileTable, Key, Value, Trait, typename Trait::KeyFile, KVValueFile<Value, Trait>>;
 	using FileSystem = KVFileSystem<Trait>;
 	using KeyFile = typename Trait::KeyFile;
 	using ValueFile = KVValueFile<Value, Trait>;
@@ -136,47 +135,34 @@ private:
 	level_type m_level{};
 
 public:
-	inline time_type GetTimeStamp() const { return m_time_stamp; }
+	// inline time_type GetTimeStamp() const { return m_time_stamp; }
 	inline bool IsPrior(const KVFileTable &r) const {
 		return m_level < r.m_level || (m_level == r.m_level && m_time_stamp > r.m_time_stamp);
-	}
-	inline KVFileTable(FileSystem *p_file_system, KVBufferTable<Key, Value, Trait> &&buffer, level_type level)
-	    : m_level{level}, m_time_stamp{p_file_system->GetTimeStamp()} {
-		Base::m_keys = KeyFile{std::move(buffer.m_keys)};
-		auto [time_stamp, file_path] = p_file_system->CreateFile(level, [this, &buffer](std::ofstream &fout) {
-			IO<KeyFile>::Write(fout, Base::m_keys);
-			fout.write((char *)buffer.m_values.GetData(), buffer.m_values.GetSize());
-		});
-		m_time_stamp = time_stamp;
-		Base::m_values =
-		    ValueFile{p_file_system, file_path, IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type),
-		              buffer.m_values.GetSize()};
 	}
 	template <typename ValueWriter>
 	inline KVFileTable(FileSystem *p_file_system, KVKeyBuffer<Key, Trait> &&key_buffer, ValueWriter &&value_writer,
 	                   size_type value_size, level_type level)
-	    : m_level{level} {
-		Base::m_keys = KeyFile{std::move(key_buffer)};
-		auto [time_stamp, file_path] = p_file_system->CreateFile(level, [this, &value_writer](std::ofstream &fout) {
-			IO<KeyFile>::Write(fout, Base::m_keys);
+	    : m_level{level}, m_time_stamp{p_file_system->GetTimeStamp()} {
+		p_file_system->CreateFile(level, [this, p_file_system, value_size, &key_buffer,
+		                                  &value_writer](std::ofstream &fout, const std::filesystem::path &file_path) {
+			this->m_keys = KeyFile{fout, std::move(key_buffer), p_file_system, file_path};
 			value_writer(fout);
+			this->m_values =
+			    ValueFile{p_file_system, file_path, (size_type)sizeof(time_type) + this->m_keys.GetSize(), value_size};
 		});
-		m_time_stamp = time_stamp;
-		Base::m_values = ValueFile{p_file_system, file_path,
-		                           IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type), value_size};
 	}
 	inline explicit KVFileTable(FileSystem *p_file_system, const std::filesystem::path &file_path, level_type level)
 	    : m_level{level} {
 		std::ifstream &fin = p_file_system->GetFileStream(file_path, 0);
 		m_time_stamp = IO<time_type>::Read(fin);
-		Base::m_keys = IO<KeyFile>::Read(fin);
-		size_type value_offset = IO<KeyFile>::GetSize(Base::m_keys) + (size_type)sizeof(time_type);
+		this->m_keys = KeyFile{fin, p_file_system, file_path};
+		size_type value_offset = this->m_keys.GetSize() + (size_type)sizeof(time_type);
 		size_type value_size = std::filesystem::file_size(file_path) - value_offset;
-		Base::m_values = ValueFile{p_file_system, file_path, value_offset, value_size};
+		this->m_values = ValueFile{p_file_system, file_path, value_offset, value_size};
 
 		p_file_system->MaintainTimeStamp(m_time_stamp);
 	}
-	inline const std::filesystem::path &GetFilePath() const { return Base::m_values.GetFilePath(); }
+	inline const std::filesystem::path &GetFilePath() const { return this->m_values.GetFilePath(); }
 };
 
 } // namespace lsm::detail

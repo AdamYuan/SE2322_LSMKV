@@ -58,11 +58,11 @@ template <int Acceleration> struct LZ4StringIO {
 		auto compressed_buffer = std::unique_ptr<char[]>(new char[max_compressed_size]);
 		auto compressed_size = LZ4_compress_fast(str.data(), compressed_buffer.get(), (int)str.length(),
 		                                         max_compressed_size, Acceleration);
-		lsm::IO<lsm::size_type>::Write(ostr, str.length());
+		lsm::detail::IO<lsm::size_type>::Write(ostr, str.length());
 		ostr.write(compressed_buffer.get(), compressed_size);
 	}
 	template <typename Stream> inline static std::string Read(Stream &istr, lsm::size_type compressed_length) {
-		lsm::size_type length = lsm::IO<lsm::size_type>::Read(istr);
+		lsm::size_type length = lsm::detail::IO<lsm::size_type>::Read(istr);
 		compressed_length -= sizeof(lsm::size_type);
 		auto compressed_buffer = std::unique_ptr<char[]>(new char[compressed_length]);
 		istr.read(compressed_buffer.get(), compressed_length);
@@ -76,9 +76,9 @@ template <int Acceleration> struct LZ4StringIO {
 
 template <typename Key> struct MyStringTrait {
 	using Compare = std::less<Key>;
-	using SkipList =
-	    lsm::SkipList<Key, lsm::KVSkipListValue<std::string>, Compare, std::default_random_engine, 1, 2, 64>;
-	using KeyFile = lsm::KVKeyFile<Key, MyStringTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
+	using SkipList = lsm::SkipList<Key, lsm::KVMemValue<std::string>, Compare, std::default_random_engine, 1, 2, 32>;
+	using KeyFile = lsm::KVCachedBloomKeyFile<Key, MyStringTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
+	// using KeyFile = lsm::KVCachedKeyFile<Key, MyStringTrait>;
 	using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 

@@ -179,7 +179,7 @@ public:
 						iterators.push_back(table.GetLowerBound(min_key));
 			iterator_heap = KVTableIteratorHeap<typename FileTable::Iterator>{std::move(iterators)};
 		}
-		m_mem_skiplist.Scan(min_key, max_key, [&iterator_heap, &func](Key key, const KVSkipListValue<Value> &sl_value) {
+		m_mem_skiplist.Scan(min_key, max_key, [&iterator_heap, &func](Key key, const KVMemValue<Value> &sl_value) {
 			while (!iterator_heap.IsEmpty() && Compare{}(iterator_heap.GetTop().GetKey(), key)) {
 				const auto &it = iterator_heap.GetTop();
 				if (!it.IsKeyDeleted())
