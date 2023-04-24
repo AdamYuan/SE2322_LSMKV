@@ -6,9 +6,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "type.hpp"
+#include "../type.hpp"
 
-namespace lsm {
+namespace lsm::detail {
 
 template <typename Type> struct IO {
 	inline static constexpr size_type GetSize(const Type &) { return sizeof(Type); }

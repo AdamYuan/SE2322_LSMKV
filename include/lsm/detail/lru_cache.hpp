@@ -1,13 +1,13 @@
 #pragma once
 
-#include "type.hpp"
+#include "../type.hpp"
 
 #include <cstddef>
 #include <list>
 #include <stdexcept>
 #include <unordered_map>
 
-namespace lsm {
+namespace lsm::detail {
 
 template <typename Key, typename Value> class LRUCache {
 private:

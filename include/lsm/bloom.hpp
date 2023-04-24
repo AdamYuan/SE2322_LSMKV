@@ -3,7 +3,7 @@
 #include <functional>
 #include <random>
 
-#include "io.hpp"
+#include "detail/io.hpp"
 #include "type.hpp"
 
 namespace lsm {
@@ -54,7 +54,7 @@ private:
 		}
 	};
 
-	template <typename> friend struct IO;
+	template <typename> friend struct detail::IO;
 
 public:
 	inline bool operator[](size_type idx) const { return m_bits[idx >> 6u] & (1ULL << (idx & 63ULL)); }
@@ -65,6 +65,7 @@ public:
 	inline bool Exist(const Key &key) const { return Hasher::template Exist<Bits>(*this, key); }
 };
 
+namespace detail {
 template <typename Key, size_type Bits, typename Hasher> struct IO<Bloom<Key, Bits, Hasher>> {
 	inline static constexpr size_type GetSize(const Bloom<Key, Bits, Hasher> &bloom) { return sizeof(bloom.m_bits); }
 	template <typename Stream> inline static void Write(Stream &ostr, const Bloom<Key, Bits, Hasher> &bloom) {
@@ -76,5 +77,6 @@ template <typename Key, size_type Bits, typename Hasher> struct IO<Bloom<Key, Bi
 		return bloom;
 	}
 };
+} // namespace detail
 
 } // namespace lsm

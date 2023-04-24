@@ -78,7 +78,7 @@ template <typename Key> struct MyStringTrait {
 	using Compare = std::less<Key>;
 	using SkipList =
 	    lsm::SkipList<Key, lsm::KVSkipListValue<std::string>, Compare, std::default_random_engine, 1, 2, 64>;
-	using Bloom = lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>;
+	using KeyFile = lsm::KVKeyFile<Key, MyStringTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
 	using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 

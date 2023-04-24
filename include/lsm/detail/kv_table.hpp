@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <utility>
@@ -8,7 +9,7 @@
 #include "kv_key_table.hpp"
 #include "kv_value_table.hpp"
 
-namespace lsm {
+namespace lsm::detail {
 
 template <typename Key, typename Value, typename Trait, typename Table> class KVTableIterator {
 private:
@@ -123,12 +124,12 @@ public:
 };
 
 template <typename Key, typename Value, typename Trait>
-class KVFileTable final : public KVTableBase<KVFileTable<Key, Value, Trait>, Key, Value, Trait, KVKeyFile<Key, Trait>,
+class KVFileTable final : public KVTableBase<KVFileTable<Key, Value, Trait>, Key, Value, Trait, typename Trait::KeyFile,
                                              KVValueFile<Value, Trait>> {
 private:
-	using Base = KVTableBase<KVFileTable, Key, Value, Trait, KVKeyFile<Key, Trait>, KVValueFile<Value, Trait>>;
+	using Base = KVTableBase<KVFileTable, Key, Value, Trait, typename Trait::KeyFile, KVValueFile<Value, Trait>>;
 	using FileSystem = KVFileSystem<Trait>;
-	using KeyFile = KVKeyFile<Key, Trait>;
+	using KeyFile = typename Trait::KeyFile;
 	using ValueFile = KVValueFile<Value, Trait>;
 
 	time_type m_time_stamp{};
@@ -178,4 +179,4 @@ public:
 	inline const std::filesystem::path &GetFilePath() const { return Base::m_values.GetFilePath(); }
 };
 
-} // namespace lsm
+} // namespace lsm::detail

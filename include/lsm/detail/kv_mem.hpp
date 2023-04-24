@@ -1,13 +1,31 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "buf_stream.hpp"
 #include "kv_filesystem.hpp"
 #include "kv_table.hpp"
-#include "kv_trait.hpp"
 
 namespace lsm {
+
+template <typename Value> class KVSkipListValue {
+private:
+	std::optional<Value> m_opt_value;
+	size_type m_size;
+
+public:
+	KVSkipListValue(Value &&value, size_type size) : m_opt_value{std::move(value)}, m_size{size} {}
+	KVSkipListValue() : m_opt_value{}, m_size{0} {}
+	inline size_type GetSize() const { return m_size; }
+	inline bool IsDeleted() const { return !m_opt_value.has_value(); }
+	inline const Value &GetValue() const { return m_opt_value.value(); }
+	inline const std::optional<Value> &GetOptValue() const { return m_opt_value; }
+};
+
+} // namespace lsm
+
+namespace lsm::detail {
 
 template <typename Key, typename Value, typename Trait> class KVMemSkipList {
 private:
@@ -18,8 +36,7 @@ private:
 	using KeyOffset = KVKeyOffset<Key>;
 
 	constexpr static size_type kMaxFileSize = Trait::kSingleFileSizeLimit;
-	constexpr static size_type kInitialFileSize =
-	    sizeof(time_type) + sizeof(size_type) + sizeof(Key) * 2 + IO<typename Trait::Bloom>::GetSize({});
+	constexpr static size_type kInitialFileSize = sizeof(time_type) + IO<typename Trait::KeyFile>::GetSize();
 
 	typename Trait::SkipList m_skiplist;
 	size_type m_file_size{kInitialFileSize};
@@ -146,7 +163,7 @@ public:
 	inline bool IsEmpty() const { return m_skiplist.IsEmpty(); }
 };
 
-template <typename Key, typename Value, typename Trait> class KVMemAppender {
+template <typename Key, typename Value, typename Trait> class KVAppender {
 private:
 	using FileSystem = KVFileSystem<Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
@@ -154,8 +171,7 @@ private:
 	using KeyOffset = KVKeyOffset<Key>;
 
 	constexpr static size_type kMaxFileSize = Trait::kSingleFileSizeLimit;
-	constexpr static size_type kInitialFileSize =
-	    sizeof(time_type) + sizeof(size_type) + sizeof(Key) * 2 + IO<typename Trait::Bloom>::GetSize({});
+	constexpr static size_type kInitialFileSize = sizeof(time_type) + IO<typename Trait::KeyFile>::GetSize();
 
 	std::vector<KeyOffset> m_key_offset_vec;
 	std::unique_ptr<byte[]> m_value_buffer;
@@ -208,7 +224,7 @@ private:
 	}
 
 public:
-	inline KVMemAppender() { reset_value_buffer(); }
+	inline KVAppender() { reset_value_buffer(); }
 	inline void Reset() {
 		m_file_size = kInitialFileSize;
 		m_key_offset_vec.clear();
@@ -240,4 +256,4 @@ public:
 	inline bool IsEmpty() const { return m_key_offset_vec.empty(); }
 };
 
-} // namespace lsm
+} // namespace lsm::detail

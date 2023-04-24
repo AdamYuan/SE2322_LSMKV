@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace lsm {
+namespace lsm::detail {
 
 template <typename Key, typename Value, typename Trait, level_type Level> class KVMerger {
 private:
@@ -24,7 +24,7 @@ private:
 	KVTableIteratorHeap<typename FileTable::Iterator> m_file_it_heap;
 	KVTableIteratorHeap<typename BufferTable::Iterator> m_buffer_it_heap;
 
-	KVMemAppender<Key, Value, Trait> m_mem_appender;
+	KVAppender<Key, Value, Trait> m_mem_appender;
 
 	std::vector<BufferTable> m_result_tables;
 

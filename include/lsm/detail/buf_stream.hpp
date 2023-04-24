@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "type.hpp"
+#include "../type.hpp"
 
-namespace lsm {
+namespace lsm::detail {
 
 // TODO: Use std::streambuf + std::istream / std::ostream
 struct IBufStream {
@@ -24,4 +24,4 @@ struct OBufStream {
 	}
 };
 
-} // namespace lsm
+} // namespace lsm::detail

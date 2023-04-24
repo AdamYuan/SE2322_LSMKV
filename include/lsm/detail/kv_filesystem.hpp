@@ -2,10 +2,10 @@
 
 #include <filesystem>
 
-#include "kv_trait.hpp"
+#include "io.hpp"
 #include "lru_cache.hpp"
 
-namespace lsm {
+namespace lsm::detail {
 
 template <typename Trait> class KVFileSystem {
 private:
