@@ -8,7 +8,7 @@ option(LSMKV_BUILD_TESTS "Build tests" ON)
 
 add_library(lsmkv INTERFACE)
 target_include_directories(lsmkv INTERFACE include)
-target_link_libraries(lsmkv INTERFACE stdc++fs)
+# target_link_libraries(lsmkv INTERFACE stdc++fs) Not needed for new compilers
 
 if (LSMKV_BUILD_TESTS)
     add_subdirectory(test/lz4)
