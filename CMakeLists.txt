@@ -14,9 +14,12 @@ if (LSMKV_BUILD_TESTS)
     add_subdirectory(test/lz4)
     add_subdirectory(test/snappy)
 
-    add_executable(lsmkv_correctness_test test/correctness.cpp)
-    target_link_libraries(lsmkv_correctness_test PRIVATE lsmkv lz4 snappy)
+    add_executable(lsmkv_correctness test/correctness.cpp)
+    target_link_libraries(lsmkv_correctness PRIVATE lsmkv lz4 snappy)
 
-    add_executable(lsmkv_persistence_test test/persistence.cpp)
-    target_link_libraries(lsmkv_persistence_test PRIVATE lsmkv lz4 snappy)
+    add_executable(lsmkv_persistence test/persistence.cpp)
+    target_link_libraries(lsmkv_persistence PRIVATE lsmkv lz4 snappy)
+
+    add_executable(lsmkv_benchmark test/benchmark.cpp)
+    target_link_libraries(lsmkv_benchmark PRIVATE lsmkv lz4 snappy)
 endif ()
