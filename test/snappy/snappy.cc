@@ -1290,7 +1290,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         DeferMemCopy(&deferred_src, &deferred_length, from, len);
       }
     } while (ip < ip_limit_min_slop &&
-             (op + deferred_length) < op_limit_min_slop);
+             (op + deferred_length) < (size_t)op_limit_min_slop);
   exit:
     ip--;
     assert(ip <= ip_limit);
@@ -1505,7 +1505,7 @@ constexpr uint32_t CalculateNeeded(uint8_t tag) {
 #if __cplusplus >= 201402L
 constexpr bool VerifyCalculateNeeded() {
   for (int i = 0; i < 1; i++) {
-    if (CalculateNeeded(i) != (char_table[i] >> 11) + 1) return false;
+    if (CalculateNeeded(i) != (char_table[i] >> 11u) + 1u) return false;
   }
   return true;
 }
