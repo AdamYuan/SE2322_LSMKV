@@ -19,8 +19,6 @@ typedef unsigned __int64 uint64_t;
 
 #include <cstdint>
 
-#define FORCE_INLINE inline __attribute__((always_inline))
-
 inline uint64_t rotl64(uint64_t x, int8_t r) { return (x << r) | (x >> (64 - r)); }
 
 #define ROTL64(x, y) rotl64(x, y)
@@ -29,9 +27,9 @@ inline uint64_t rotl64(uint64_t x, int8_t r) { return (x << r) | (x >> (64 - r))
 
 #endif // !defined(_MSC_VER)
 
-FORCE_INLINE uint64_t getblock64(const uint64_t *p, int i) { return p[i]; }
+inline uint64_t getblock64(const uint64_t *p, int i) { return p[i]; }
 
-FORCE_INLINE uint64_t fmix64(uint64_t k) {
+inline uint64_t fmix64(uint64_t k) {
 	k ^= k >> 33;
 	k *= BIG_CONSTANT(0xff51afd7ed558ccd);
 	k ^= k >> 33;
