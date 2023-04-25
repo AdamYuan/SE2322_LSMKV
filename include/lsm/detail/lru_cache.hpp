@@ -14,8 +14,12 @@ private:
 	using KVPair = std::pair<Key, Value>;
 	using Iterator = typename std::list<KVPair>::iterator;
 
+	struct fs_path_hasher {
+		std::size_t operator()(const std::filesystem::path &path) const { return hash_value(path); }
+	};
+
 	std::list<KVPair> m_list;
-	std::unordered_map<Key, Iterator> m_map;
+	std::unordered_map<Key, Iterator, fs_path_hasher> m_map;
 	size_type m_capacity;
 
 public:
@@ -46,4 +50,4 @@ public:
 	}
 };
 
-} // namespace lsm
+} // namespace lsm::detail
