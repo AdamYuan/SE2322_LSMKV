@@ -17,9 +17,10 @@ private:
 	struct fs_path_hasher {
 		std::size_t operator()(const std::filesystem::path &path) const { return hash_value(path); }
 	};
+	using std_hasher = std::conditional_t<std::is_same_v<std::filesystem::path, Key>, fs_path_hasher, std::hash<Key>>;
 
 	std::list<KVPair> m_list;
-	std::unordered_map<Key, Iterator, fs_path_hasher> m_map;
+	std::unordered_map<Key, Iterator, std_hasher> m_map;
 	size_type m_capacity;
 
 public:
