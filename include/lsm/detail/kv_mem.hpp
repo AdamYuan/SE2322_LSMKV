@@ -27,7 +27,7 @@ public:
 
 namespace lsm::detail {
 
-template <typename Key, typename Value, typename Trait> class KVMemSkipList {
+template <typename Key, typename Value, typename Trait> class KVMemContainer {
 private:
 	using FileSystem = KVFileSystem<Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
@@ -38,13 +38,13 @@ private:
 	constexpr static size_type kMaxFileSize = Trait::kSingleFileSizeLimit;
 	constexpr static size_type kInitialFileSize = sizeof(time_type) + Trait::KeyFile::GetHeaderSize();
 
-	typename Trait::SkipList m_skiplist;
+	typename Trait::Container m_container;
 	size_type m_file_size{kInitialFileSize};
 
 	template <typename Table, typename PopFunc>
 	inline std::optional<Table> put(Key key, Value &&value, PopFunc &&pop_func) {
 		size_type value_size = ValueIO::GetSize(value);
-		if (m_skiplist.Replace(key, [this, &value, value_size](KVMemValue<Value> *p_sl_value, bool exists) -> bool {
+		if (m_container.Replace(key, [this, &value, value_size](KVMemValue<Value> *p_sl_value, bool exists) -> bool {
 			    size_type new_size = m_file_size;
 			    if (exists) {
 				    new_size -= p_sl_value->GetSize();
@@ -62,12 +62,12 @@ private:
 		Table ret = pop_func();
 		Reset();
 		m_file_size += sizeof(KeyOffset) + value_size;
-		m_skiplist.Insert(key, {std::move(value), value_size});
+		m_container.Insert(key, {std::move(value), value_size});
 		return std::optional<Table>{std::move(ret)};
 	}
 
 	template <typename Table, typename PopFunc> inline std::optional<Table> del(Key key, PopFunc &&pop_func) {
-		if (m_skiplist.Replace(key, [this](KVMemValue<Value> *p_sl_value, bool exists) -> bool {
+		if (m_container.Replace(key, [this](KVMemValue<Value> *p_sl_value, bool exists) -> bool {
 			    size_type new_size = m_file_size;
 			    if (exists)
 				    new_size -= p_sl_value->GetSize();
@@ -84,53 +84,53 @@ private:
 		Table ret = pop_func();
 		Reset();
 		m_file_size += sizeof(KeyOffset);
-		m_skiplist.Insert(key, {});
+		m_container.Insert(key, {});
 		return std::optional<Table>{std::move(ret)};
 	}
 
 public:
 	inline void Reset() {
-		m_skiplist.Clear();
+		m_container.Clear();
 		m_file_size = kInitialFileSize;
 	}
 	inline BufferTable PopBuffer() {
-		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_skiplist.GetSize()]);
+		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_container.GetSize()]);
 
-		size_type value_size = m_file_size - kInitialFileSize - m_skiplist.GetSize() * sizeof(KeyOffset);
+		size_type value_size = m_file_size - kInitialFileSize - m_container.GetSize() * sizeof(KeyOffset);
 		auto value_buffer = std::unique_ptr<byte[]>(new byte[value_size]);
 		OBufStream value_stream{(char *)value_buffer.get()};
 
 		size_type key_id = 0;
-		m_skiplist.ForEach([&key_buffer, &key_id, &value_stream](const Key &key, const KVMemValue<Value> &sl_value) {
+		m_container.ForEach([&key_buffer, &key_id, &value_stream](const Key &key, const KVMemValue<Value> &sl_value) {
 			key_buffer[key_id++] = KeyOffset{key, value_stream.pos, sl_value.IsDeleted()};
 			if (!sl_value.IsDeleted())
 				ValueIO::Write(value_stream, sl_value.GetValue());
 		});
 
-		return BufferTable{KVKeyBuffer<Key, Trait>{std::move(key_buffer), m_skiplist.GetSize()},
+		return BufferTable{KVKeyBuffer<Key, Trait>{std::move(key_buffer), m_container.GetSize()},
 		                   KVValueBuffer<Value, Trait>{std::move(value_buffer), value_size}};
 	}
 	inline FileTable PopFile(FileSystem *p_file_system, level_type level) {
-		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_skiplist.GetSize()]);
+		auto key_buffer = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[m_container.GetSize()]);
 
-		size_type value_size = m_file_size - kInitialFileSize - m_skiplist.GetSize() * sizeof(KeyOffset);
+		size_type value_size = m_file_size - kInitialFileSize - m_container.GetSize() * sizeof(KeyOffset);
 
 		{
 			size_type key_id = 0, value_pos = 0;
-			m_skiplist.ForEach([&key_buffer, &key_id, &value_pos](const Key &key, const KVMemValue<Value> &sl_value) {
+			m_container.ForEach([&key_buffer, &key_id, &value_pos](const Key &key, const KVMemValue<Value> &sl_value) {
 				key_buffer[key_id++] = KeyOffset{key, value_pos, sl_value.IsDeleted()};
 				value_pos += sl_value.GetSize();
 			});
 		}
 
 		const auto value_writer = [this](std::ofstream &stream) {
-			m_skiplist.ForEach([&stream](const Key &key, const KVMemValue<Value> &sl_value) {
+			m_container.ForEach([&stream](const Key &key, const KVMemValue<Value> &sl_value) {
 				if (!sl_value.IsDeleted())
 					ValueIO::Write(stream, sl_value.GetValue());
 			});
 		};
 
-		return FileTable{p_file_system, KVKeyBuffer<Key, Trait>{std::move(key_buffer), m_skiplist.GetSize()},
+		return FileTable{p_file_system, KVKeyBuffer<Key, Trait>{std::move(key_buffer), m_container.GetSize()},
 		                 value_writer, value_size, level};
 	}
 	inline std::optional<BufferTable> Put(Key key, Value &&value) {
@@ -154,10 +154,10 @@ public:
 	}
 
 	template <typename Func> inline void Scan(Key min_key, Key max_key, Func &&func) const {
-		m_skiplist.Scan(min_key, max_key, std::forward<Func>(func));
+		m_container.Scan(min_key, max_key, std::forward<Func>(func));
 	}
-	inline std::optional<KVMemValue<Value>> Get(Key key) const { return m_skiplist.Search(key); }
-	inline bool IsEmpty() const { return m_skiplist.IsEmpty(); }
+	inline std::optional<KVMemValue<Value>> Get(Key key) const { return m_container.Search(key); }
+	inline bool IsEmpty() const { return m_container.IsEmpty(); }
 };
 
 } // namespace lsm::detail

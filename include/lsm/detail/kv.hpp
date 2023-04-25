@@ -32,10 +32,10 @@ private:
 
 	using FileTable = KVFileTable<Key, Value, Trait>;
 	using BufferTable = KVBufferTable<Key, Value, Trait>;
-	using MemSkipList = KVMemSkipList<Key, Value, Trait>;
+	using MemContainer = KVMemContainer<Key, Value, Trait>;
 	using Compare = typename Trait::Compare;
 
-	MemSkipList m_mem_skiplist;
+	MemContainer m_mem_table;
 	std::vector<FileTable> m_levels[kLevels + 1];
 
 	FileSystem m_file_system;
@@ -129,21 +129,21 @@ public:
 	}
 
 	inline ~KV() {
-		if (!m_mem_skiplist.IsEmpty()) {
+		if (!m_mem_table.IsEmpty()) {
 			if (is_level_0_full())
-				compaction_0(m_mem_skiplist.PopBuffer());
+				compaction_0(m_mem_table.PopBuffer());
 			else
-				m_mem_skiplist.PopFile(&m_file_system, 0);
+				m_mem_table.PopFile(&m_file_system, 0);
 		}
 	}
 
 	inline void Put(Key key, Value &&value) {
 		if (is_level_0_full()) {
-			std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Put(key, std::move(value));
+			std::optional<BufferTable> opt_buffer_table = m_mem_table.Put(key, std::move(value));
 			if (opt_buffer_table.has_value())
 				compaction_0(std::move(opt_buffer_table.value()));
 		} else {
-			std::optional<FileTable> opt_file_table = m_mem_skiplist.Put(key, std::move(value), &m_file_system, 0);
+			std::optional<FileTable> opt_file_table = m_mem_table.Put(key, std::move(value), &m_file_system, 0);
 			if (opt_file_table.has_value())
 				m_levels[0].push_back(std::move(opt_file_table.value()));
 		}
@@ -152,7 +152,7 @@ public:
 	inline void Put(Key key, const Value &value) { Put(key, Value{value}); }
 
 	inline std::optional<Value> Get(Key key) const {
-		auto opt_sl_value = m_mem_skiplist.Get(key);
+		auto opt_sl_value = m_mem_table.Get(key);
 		if (opt_sl_value.has_value())
 			return opt_sl_value.value().GetOptValue();
 
@@ -179,7 +179,7 @@ public:
 						iterators.push_back(table.GetLowerBound(min_key));
 			iterator_heap = KVTableIteratorHeap<typename FileTable::Iterator>{std::move(iterators)};
 		}
-		m_mem_skiplist.Scan(min_key, max_key, [&iterator_heap, &func](Key key, const KVMemValue<Value> &sl_value) {
+		m_mem_table.Scan(min_key, max_key, [&iterator_heap, &func](Key key, const KVMemValue<Value> &sl_value) {
 			while (!iterator_heap.IsEmpty() && Compare{}(iterator_heap.GetTop().GetKey(), key)) {
 				const auto &it = iterator_heap.GetTop();
 				if (!it.IsKeyDeleted())
@@ -201,7 +201,7 @@ public:
 
 	inline bool Delete(Key key) {
 		// Check whether the key is already deleted
-		auto opt_opt_value = m_mem_skiplist.Get(key);
+		auto opt_opt_value = m_mem_table.Get(key);
 		if (opt_opt_value.has_value()) {
 			if (opt_opt_value.value().IsDeleted())
 				return false;
@@ -220,11 +220,11 @@ public:
 		}
 	End_Check:
 		if (is_level_0_full()) {
-			std::optional<BufferTable> opt_buffer_table = m_mem_skiplist.Delete(key);
+			std::optional<BufferTable> opt_buffer_table = m_mem_table.Delete(key);
 			if (opt_buffer_table.has_value())
 				compaction_0(std::move(opt_buffer_table.value()));
 		} else {
-			std::optional<FileTable> opt_file_table = m_mem_skiplist.Delete(key, &m_file_system, 0);
+			std::optional<FileTable> opt_file_table = m_mem_table.Delete(key, &m_file_system, 0);
 			if (opt_file_table.has_value())
 				m_levels[0].push_back(std::move(opt_file_table.value()));
 		}
@@ -232,7 +232,7 @@ public:
 	}
 
 	inline void Reset() {
-		m_mem_skiplist.Reset();
+		m_mem_table.Reset();
 		for (auto &level_vec : m_levels)
 			level_vec.clear();
 		m_file_system.Reset();

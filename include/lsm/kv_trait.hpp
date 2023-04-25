@@ -18,7 +18,7 @@ using KVCachedBloomKeyFile = detail::KVCachedBloomKeyFile<Key, Trait, Bloom>;
 
 template <typename Key, typename Value, typename CompareType = std::less<Key>> struct KVDefaultTrait {
 	using Compare = CompareType;
-	using SkipList = lsm::SkipList<Key, KVMemValue<Value>, Compare, std::default_random_engine, 1, 2, 64>;
+	using Container = lsm::SkipList<Key, KVMemValue<Value>, Compare, std::default_random_engine, 1, 2, 64>;
 	using KeyFile = lsm::KVCachedBloomKeyFile<Key, KVDefaultTrait, Bloom<Key, 10240 * 8>>;
 	using ValueIO = detail::IO<Value>;
 	constexpr static size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
