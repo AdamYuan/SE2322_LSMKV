@@ -11,7 +11,11 @@ template <typename Trait> class KVFileSystem {
 private:
 	constexpr static level_type kLevels = Trait::kLevels;
 
-	mutable LRUCache<std::filesystem::path, std::ifstream> m_input_stream_cache;
+	struct fs_path_hasher {
+		std::size_t operator()(const std::filesystem::path &path) const { return hash_value(path); }
+	};
+
+	mutable LRUCache<std::filesystem::path, std::ifstream, fs_path_hasher> m_input_stream_cache;
 	std::filesystem::path m_directory;
 	time_type m_time_stamp;
 

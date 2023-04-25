@@ -35,7 +35,7 @@ private:
 	using ValueIO = typename Trait::ValueIO;
 	using KeyOffset = KVKeyOffset<Key>;
 
-	constexpr static size_type kMaxFileSize = Trait::kSingleFileSizeLimit;
+	constexpr static size_type kMaxFileSize = Trait::kMaxFileSize;
 	constexpr static size_type kInitialFileSize = sizeof(time_type) + Trait::KeyFile::GetHeaderSize();
 
 	typename Trait::Container m_container;

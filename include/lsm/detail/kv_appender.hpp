@@ -15,7 +15,7 @@ private:
 	using FileTable = KVFileTable<Key, Value, Trait>;
 	using KeyOffset = KVKeyOffset<Key>;
 
-	constexpr static size_type kMaxFileSize = Trait::kSingleFileSizeLimit;
+	constexpr static size_type kMaxFileSize = Trait::kMaxFileSize;
 	constexpr static size_type kInitialFileSize = sizeof(time_type) + Trait::KeyFile::GetHeaderSize();
 
 	std::vector<KeyOffset> m_key_offset_vec;

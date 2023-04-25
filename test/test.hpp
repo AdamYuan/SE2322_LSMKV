@@ -79,8 +79,8 @@ template <typename Key> struct MyStringTrait : public lsm::KVDefaultTrait<Key, s
 	using Container = lsm::SkipList<Key, lsm::KVMemValue<std::string>, Compare, std::default_random_engine, 1, 2, 32>;
 	using KeyFile = lsm::KVCachedBloomKeyFile<Key, MyStringTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
 	// using KeyFile = lsm::KVUncachedKeyFile<Key, MyStringTrait>;
-	using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
-	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
+	// using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
+	constexpr static lsm::size_type kMaxFileSize = 2 * 1024 * 1024;
 
 	constexpr static lsm::level_type kLevels = 5;
 	constexpr static lsm::KVLevelConfig kLevelConfigs[] = {
