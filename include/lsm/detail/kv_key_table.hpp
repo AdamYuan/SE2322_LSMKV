@@ -25,7 +25,10 @@ public:
 };
 #pragma pack(pop)
 
-template <typename Key> class KVKeyTableBase {
+template <typename Key, typename Trait> class KVKeyTableBase {
+private:
+	using Compare = typename Trait::Compare;
+
 protected:
 	size_type m_count{};
 	Key m_min{}, m_max{};
@@ -37,9 +40,15 @@ public:
 	inline size_type GetCount() const { return m_count; }
 	inline Key GetMin() const { return m_min; }
 	inline Key GetMax() const { return m_max; }
+
+	inline bool IsMinMaxExcluded(Key key) const {
+		return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key);
+	}
+	inline bool IsExtraExcluded(Key) const { return false; }
 };
 
-template <typename Derived, typename Key, typename Trait> class KVCachedKeyTableBase : public KVKeyTableBase<Key> {
+template <typename Derived, typename Key, typename Trait>
+class KVCachedKeyTableBase : public KVKeyTableBase<Key, Trait> {
 protected:
 	using Compare = typename Trait::Compare;
 	using KeyOffset = KVKeyOffset<Key>;
@@ -51,7 +60,7 @@ public:
 
 	inline KVCachedKeyTableBase() = default;
 	inline KVCachedKeyTableBase(std::unique_ptr<KeyOffset[]> &&keys, size_type count)
-	    : KVKeyTableBase<Key>(keys[0].GetKey(), keys[count - 1].GetKey(), count) {
+	    : KVKeyTableBase<Key, Trait>(keys[0].GetKey(), keys[count - 1].GetKey(), count) {
 		m_keys = std::move(keys);
 	}
 
@@ -72,7 +81,7 @@ public:
 		return key_it;
 	}
 	inline Index Find(Key key) const {
-		if (static_cast<const Derived *>(this)->IsExcluded(key))
+		if (this->IsMinMaxExcluded(key) || static_cast<const Derived *>(this)->IsExtraExcluded(key))
 			return GetEnd();
 		const KeyOffset *key_it = GetLowerBound(key);
 		return Compare{}(key_it->GetKey(), key) || Compare{}(key, key_it->GetKey()) ? GetEnd() : key_it;
@@ -80,7 +89,8 @@ public:
 	inline static KeyOffset GetKeyOffset(Index index) { return *index; }
 };
 
-template <typename Derived, typename Key, typename Trait> class KVUncachedKeyTableBase : public KVKeyTableBase<Key> {
+template <typename Derived, typename Key, typename Trait>
+class KVUncachedKeyTableBase : public KVKeyTableBase<Key, Trait> {
 protected:
 	using Compare = typename Trait::Compare;
 	using KeyOffset = KVKeyOffset<Key>;
@@ -96,7 +106,8 @@ public:
 	    : m_p_file_system{p_file_system}, m_file_path{std::move(file_path)} {}
 	inline KVUncachedKeyTableBase(KVFileSystem<Trait> *p_file_system, std::filesystem::path file_path, Key min, Key max,
 	                              size_type count)
-	    : KVKeyTableBase<Key>(min, max, count), m_p_file_system{p_file_system}, m_file_path{std::move(file_path)} {}
+	    : KVKeyTableBase<Key, Trait>(min, max, count), m_p_file_system{p_file_system},
+	      m_file_path{std::move(file_path)} {}
 
 	inline Index GetBegin() const { return 0; }
 	inline Index GetEnd() const { return this->m_count; }
@@ -110,6 +121,8 @@ public:
 		return this->m_count;
 	}
 	inline Index Find(Key key) const {
+		if (this->IsMinMaxExcluded(key) || static_cast<const Derived *>(this)->IsExtraExcluded(key))
+			return GetEnd();
 		std::ifstream &fin = m_p_file_system->GetFileStream(m_file_path, sizeof(time_type) + Derived::GetHeaderSize());
 		for (Index i = 0; i < this->m_count; ++i) {
 			KeyOffset key_offset = IO<KeyOffset>::Read(fin);
@@ -119,7 +132,6 @@ public:
 		return this->m_count;
 	}
 	inline KeyOffset GetKeyOffset(Index index) const {
-		// TODO: Cache it
 		return IO<KeyOffset>::Read(m_p_file_system->GetFileStream(
 		    m_file_path, sizeof(time_type) + Derived::GetHeaderSize() + index * (sizeof(KeyOffset))));
 	}
@@ -140,7 +152,6 @@ private:
 public:
 	inline KVKeyBuffer() = default;
 	inline KVKeyBuffer(std::unique_ptr<KeyOffset[]> &&keys, size_type count) : Base{std::move(keys), count} {}
-	inline bool IsExcluded(Key key) const { return Compare{}(key, Base::GetMin()) || Compare{}(Base::GetMax(), key); }
 };
 
 template <typename Derived, typename Key> class KVKeyFileBase {
@@ -178,7 +189,6 @@ public:
 		this->m_max = IO<Key>::Read(istr);
 	}
 
-	inline bool IsExcluded(Key key) const { return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key); }
 	inline static constexpr size_type GetHeaderSize() { return sizeof(size_type) + sizeof(Key) * 2; }
 };
 
@@ -217,9 +227,7 @@ public:
 		this->m_bloom = IO<Bloom>::Read(istr);
 	}
 
-	inline bool IsExcluded(Key key) const {
-		return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key) || !m_bloom.Exist(key);
-	}
+	inline bool IsExtraExcluded(Key key) const { return !m_bloom.Exist(key); }
 	inline static constexpr size_type GetHeaderSize() {
 		return sizeof(size_type) + sizeof(Key) * 2 + IO<Bloom>::GetSize({});
 	}
@@ -257,9 +265,7 @@ public:
 		this->m_keys = std::unique_ptr<KVKeyOffset<Key>[]>(new KVKeyOffset<Key>[this->m_count]);
 		istr.read((char *)this->m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
 	}
-	inline bool IsExcluded(Key key) const {
-		return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key) || !m_bloom.Exist(key);
-	}
+	inline bool IsExtraExcluded(Key key) const { return !m_bloom.Exist(key); }
 	inline static constexpr size_type GetHeaderSize() {
 		return sizeof(size_type) + sizeof(Key) * 2 + IO<Bloom>::GetSize({});
 	}
@@ -293,7 +299,6 @@ public:
 		istr.read((char *)this->m_keys.get(), this->m_count * sizeof(KVKeyOffset<Key>));
 	}
 
-	inline bool IsExcluded(Key key) const { return Compare{}(key, this->GetMin()) || Compare{}(this->GetMax(), key); }
 	inline static constexpr size_type GetHeaderSize() { return sizeof(size_type) + sizeof(Key) * 2; }
 };
 
