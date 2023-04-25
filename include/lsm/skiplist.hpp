@@ -158,14 +158,16 @@ public:
 		return node ? node->value : std::optional<Value>{};
 	}
 	inline void Insert(Key &&key, Value &&value) { insert_impl(std::move(key), std::move(value)); }
-	inline void Insert(Key &&key, const Value &value) { insert_impl(std::move(key), Value(value)); }
-	inline void Insert(const Key &key, Value &&value) { insert_impl(Key(key), std::move(value)); }
-	inline void Insert(const Key &key, const Value &value) { insert_impl(Key(key), Value(value)); }
+	inline void Insert(Key &&key, const Value &value) { insert_impl(std::move(key), std::move(Value(value))); }
+	inline void Insert(const Key &key, Value &&value) { insert_impl(std::move(Key(key)), std::move(value)); }
+	inline void Insert(const Key &key, const Value &value) {
+		insert_impl(std::move(Key(key)), std::move(Value(value)));
+	}
 	template <typename Replacer> inline bool Replace(Key &&key, Replacer &&replacer) {
 		return replace_impl(std::move(key), std::forward<Replacer>(replacer));
 	}
 	template <typename Replacer> inline bool Replace(const Key &key, Replacer &&replacer) {
-		return replace_impl(Key(key), std::forward<Replacer>(replacer));
+		return replace_impl(std::move(Key(key)), std::forward<Replacer>(replacer));
 	}
 	inline size_type GetSize() const { return m_size; }
 	inline bool IsEmpty() const { return m_size == 0; }
