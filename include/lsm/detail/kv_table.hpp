@@ -13,7 +13,7 @@ namespace lsm::detail {
 
 template <typename Key, typename Value, typename Trait, typename Table> class KVTableIterator {
 private:
-	using KeyIndex = typename decltype((const Table *) {} -> m_keys)::Index;
+	using KeyIndex = typename decltype(((const Table *)0)->m_keys)::Index;
 	const Table *m_p_table;
 	KeyIndex m_key_index;
 
