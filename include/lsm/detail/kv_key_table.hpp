@@ -98,6 +98,9 @@ protected:
 	KVFileSystem<Trait> *m_p_file_system{};
 	std::filesystem::path m_file_path;
 
+	mutable KeyOffset m_cached_key_offset;
+	mutable size_type m_cached_index = -1;
+
 public:
 	using Index = size_type;
 
@@ -132,8 +135,12 @@ public:
 		return this->m_count;
 	}
 	inline KeyOffset GetKeyOffset(Index index) const {
-		return IO<KeyOffset>::Read(m_p_file_system->GetFileStream(
+		if (m_cached_index == index)
+			return m_cached_key_offset;
+		m_cached_index = index;
+		m_cached_key_offset = IO<KeyOffset>::Read(m_p_file_system->GetFileStream(
 		    m_file_path, sizeof(time_type) + Derived::GetHeaderSize() + index * (sizeof(KeyOffset))));
+		return m_cached_key_offset;
 	}
 };
 

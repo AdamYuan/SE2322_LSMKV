@@ -77,9 +77,8 @@ template <int Acceleration> struct LZ4StringIO {
 template <typename Key> struct MyStringTrait {
 	using Compare = std::less<Key>;
 	using SkipList = lsm::SkipList<Key, lsm::KVMemValue<std::string>, Compare, std::default_random_engine, 1, 2, 32>;
-	using KeyFile =
-	    lsm::KVUncachedBloomKeyFile<Key, MyStringTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
-	// using KeyFile = lsm::KVCachedKeyFile<Key, MyStringTrait>;
+	using KeyFile = lsm::KVCachedBloomKeyFile<Key, MyStringTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
+	// using KeyFile = lsm::KVUncachedKeyFile<Key, MyStringTrait>;
 	using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
 	constexpr static lsm::size_type kSingleFileSizeLimit = 2 * 1024 * 1024;
 
