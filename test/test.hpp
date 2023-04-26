@@ -42,7 +42,7 @@ struct SnappyStringIO {
 		compressed.resize(length);
 		istr.read(compressed.data(), length);
 		snappy::Uncompress(compressed.data(), length, &str);
-		return std::move(str);
+		return str;
 	}
 };
 
