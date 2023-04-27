@@ -85,7 +85,7 @@ int main() {
 	matplot::bar(x, tp_y);
 	matplot::legend({"Put", "Get (SEQ)", "Get (RAND)", "Delete"});
 	matplot::xlabel("Data Size (KiB)");
-	matplot::ylabel("Throughput (call/prof_sec)");
+	matplot::ylabel("Throughput (call/sec)");
 	matplot::show();
 
 	return 0;
