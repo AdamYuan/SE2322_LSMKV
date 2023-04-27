@@ -24,5 +24,8 @@ if (LSMKV_BUILD_TESTS)
     if (Matplot++_FOUND)
         add_executable(lsmkv_prof_regular test/prof_regular.cpp)
         target_link_libraries(lsmkv_prof_regular PRIVATE lsmkv Matplot++::matplot)
+
+        add_executable(lsmkv_prof_cache test/prof_cache.cpp)
+        target_link_libraries(lsmkv_prof_cache PRIVATE lsmkv Matplot++::matplot)
     endif ()
 endif ()
