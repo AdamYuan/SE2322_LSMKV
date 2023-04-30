@@ -7,15 +7,7 @@
 #include "kv_merge.hpp"
 #include "kv_table.hpp"
 
-namespace lsm {
-
-enum class KVLevelType { kTiering, kLeveling };
-struct KVLevelConfig {
-	size_type max_files;
-	KVLevelType type;
-};
-
-} // namespace lsm
+#include "../kv_level.hpp"
 
 namespace lsm::detail {
 
@@ -23,7 +15,7 @@ template <typename Key, typename Value, typename Trait> class KV {
 	static_assert(std::is_integral_v<Key>);
 
 private:
-	constexpr static level_type kLevels = Trait::kLevels;
+	constexpr static level_type kLevels = sizeof(Trait::kLevelConfigs) / sizeof(KVLevelConfig);
 	constexpr static const KVLevelConfig *kLevelConfigs = Trait::kLevelConfigs;
 
 	static_assert(kLevels == 0 || kLevelConfigs[0].type == KVLevelType::kTiering);

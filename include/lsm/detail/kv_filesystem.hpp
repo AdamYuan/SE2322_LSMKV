@@ -5,11 +5,13 @@
 #include "io.hpp"
 #include "lru_cache.hpp"
 
+#include "../kv_level.hpp"
+
 namespace lsm::detail {
 
 template <typename Trait> class KVFileSystem {
 private:
-	constexpr static level_type kLevels = Trait::kLevels;
+	constexpr static level_type kLevels = sizeof(Trait::kLevelConfigs) / sizeof(KVLevelConfig);
 
 	struct fs_path_hasher {
 		std::size_t operator()(const std::filesystem::path &path) const { return hash_value(path); }

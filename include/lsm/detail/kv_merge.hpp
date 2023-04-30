@@ -68,7 +68,8 @@ public:
 	}
 	template <typename PostFileTableFunc>
 	inline std::vector<BufferTable> Run(size_type file_count, PostFileTableFunc &&post_file_table_func) {
-		static constexpr bool kDelete = Level == Trait::kLevels;
+		static constexpr level_type kLevels = sizeof(Trait::kLevelConfigs) / sizeof(KVLevelConfig);
+		static constexpr bool kDelete = Level == kLevels;
 
 		m_remain_file_count = file_count;
 

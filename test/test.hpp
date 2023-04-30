@@ -82,7 +82,6 @@ template <typename Key> struct MyStringTrait : public lsm::KVDefaultTrait<Key, s
 	// using ValueIO = SnappyStringIO; // LZ4StringIO<4000>;
 	constexpr static lsm::size_type kMaxFileSize = 2 * 1024 * 1024;
 
-	constexpr static lsm::level_type kLevels = 5;
 	constexpr static lsm::KVLevelConfig kLevelConfigs[] = {
 	    {2, lsm::KVLevelType::kTiering},   {4, lsm::KVLevelType::kLeveling},  {8, lsm::KVLevelType::kLeveling},
 	    {16, lsm::KVLevelType::kLeveling}, {32, lsm::KVLevelType::kLeveling},

@@ -23,7 +23,6 @@ template <typename Key, typename Value, typename CompareType = std::less<Key>> s
 	using ValueIO = detail::IO<Value>;
 	constexpr static size_type kMaxFileSize = 2 * 1024 * 1024;
 
-	constexpr static level_type kLevels = 5;
 	constexpr static KVLevelConfig kLevelConfigs[] = {
 	    {2, KVLevelType::kTiering},   {4, KVLevelType::kLeveling},  {8, KVLevelType::kLeveling},
 	    {16, KVLevelType::kLeveling}, {32, KVLevelType::kLeveling},

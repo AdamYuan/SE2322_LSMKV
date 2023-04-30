@@ -27,7 +27,6 @@ template <typename Key> struct StandardTrait : public lsm::KVDefaultTrait<Key, s
 	using KeyFile = lsm::KVCachedBloomKeyFile<Key, StandardTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
 	constexpr static lsm::size_type kMaxFileSize = 2 * 1024 * 1024;
 
-	constexpr static lsm::level_type kLevels = 5;
 	constexpr static lsm::KVLevelConfig kLevelConfigs[] = {{2, lsm::KVLevelType::kTiering},
 	                                                       {4, lsm::KVLevelType::kLeveling},
 	                                                       {8, lsm::KVLevelType::kLeveling},
