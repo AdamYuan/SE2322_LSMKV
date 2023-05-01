@@ -1,0 +1,1300 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="560"
+   height="420"
+   viewBox="0 0 560 420"
+   version="1.1"
+   id="svg1244"
+   sodipodi:docname="latency.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1248" />
+  <sodipodi:namedview
+     id="namedview1246"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="1.0190476"
+     inkscape:cx="229.13552"
+     inkscape:cy="106.47196"
+     inkscape:window-width="1228"
+     inkscape:window-height="1029"
+     inkscape:window-x="12"
+     inkscape:window-y="37"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g841" />
+  <title
+     id="title903">Gnuplot</title>
+  <desc
+     id="desc905">Produced by GNUPLOT 5.4 patchlevel 6 </desc>
+  <g
+     id="gnuplot_canvas">
+    <rect
+       x="0"
+       y="0"
+       width="560"
+       height="420"
+       fill="none"
+       id="rect907" />
+    <defs
+       id="defs935">
+      <circle
+         id="gpDot"
+         r="0.5"
+         stroke-width="0.5"
+         stroke="currentColor" />
+      <path
+         id="gpPt0"
+         stroke-width="0.267"
+         stroke="currentColor"
+         d="M-1,0 h2 M0,-1 v2" />
+      <path
+         id="gpPt1"
+         stroke-width="0.267"
+         stroke="currentColor"
+         d="M-1,-1 L1,1 M1,-1 L-1,1" />
+      <path
+         id="gpPt2"
+         stroke-width="0.267"
+         stroke="currentColor"
+         d="M-1,0 L1,0 M0,-1 L0,1 M-1,-1 L1,1 M-1,1 L1,-1" />
+      <rect
+         id="gpPt3"
+         stroke-width="0.267"
+         stroke="currentColor"
+         x="-1"
+         y="-1"
+         width="2"
+         height="2" />
+      <rect
+         id="gpPt4"
+         stroke-width="0.267"
+         stroke="currentColor"
+         fill="currentColor"
+         x="-1"
+         y="-1"
+         width="2"
+         height="2" />
+      <circle
+         id="gpPt5"
+         stroke-width="0.267"
+         stroke="currentColor"
+         cx="0"
+         cy="0"
+         r="1" />
+      <use
+         xlink:href="#gpPt5"
+         id="gpPt6"
+         fill="currentColor"
+         stroke="none" />
+      <path
+         id="gpPt7"
+         stroke-width="0.267"
+         stroke="currentColor"
+         d="M0,-1.33 L-1.33,0.67 L1.33,0.67 z" />
+      <use
+         xlink:href="#gpPt7"
+         id="gpPt8"
+         fill="currentColor"
+         stroke="none" />
+      <use
+         xlink:href="#gpPt7"
+         id="gpPt9"
+         stroke="currentColor"
+         transform="rotate(180)" />
+      <use
+         xlink:href="#gpPt9"
+         id="gpPt10"
+         fill="currentColor"
+         stroke="none" />
+      <use
+         xlink:href="#gpPt3"
+         id="gpPt11"
+         stroke="currentColor"
+         transform="rotate(45)" />
+      <use
+         xlink:href="#gpPt11"
+         id="gpPt12"
+         fill="currentColor"
+         stroke="none" />
+      <path
+         id="gpPt13"
+         stroke-width="0.267"
+         stroke="currentColor"
+         d="M0,1.330 L1.265,0.411 L0.782,-1.067 L-0.782,-1.076 L-1.265,0.411 z" />
+      <use
+         xlink:href="#gpPt13"
+         id="gpPt14"
+         fill="currentColor"
+         stroke="none" />
+      <filter
+         id="textbox"
+         filterUnits="objectBoundingBox"
+         x="0"
+         y="0"
+         height="1"
+         width="1">
+        <feFlood
+           flood-color="white"
+           flood-opacity="1"
+           result="bgnd"
+           id="feFlood925" />
+        <feComposite
+           in="SourceGraphic"
+           in2="bgnd"
+           operator="atop"
+           id="feComposite927" />
+      </filter>
+      <filter
+         id="greybox"
+         filterUnits="objectBoundingBox"
+         x="0"
+         y="0"
+         height="1"
+         width="1">
+        <feFlood
+           flood-color="lightgrey"
+           flood-opacity="1"
+           result="grey"
+           id="feFlood930" />
+        <feComposite
+           in="SourceGraphic"
+           in2="grey"
+           operator="atop"
+           id="feComposite932" />
+      </filter>
+    </defs>
+    <g
+       fill="none"
+       color="white"
+       stroke="currentColor"
+       stroke-width="1.00"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g937" />
+    <g
+       fill="none"
+       color="white"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g939" />
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g949">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,373.80 L78.42,373.80  "
+         id="path941" />
+      <g
+         transform="translate(65.80,377.05)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="end"
+         id="g947">
+        <text
+           id="text945"><tspan
+             font-family="Helvetica"
+             id="tspan943">0</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g959">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,316.75 L78.42,316.75  "
+         id="path951" />
+      <g
+         transform="translate(65.80,320.00)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="end"
+         id="g957">
+        <text
+           id="text955"><tspan
+             font-family="Helvetica"
+             id="tspan953">2</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g969">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,259.70 L78.42,259.70  "
+         id="path961" />
+      <g
+         transform="translate(65.80,262.95)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="end"
+         id="g967">
+        <text
+           id="text965"><tspan
+             font-family="Helvetica"
+             id="tspan963">4</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g979">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,202.65 L78.42,202.65  "
+         id="path971" />
+      <g
+         transform="translate(65.80,205.90)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="end"
+         id="g977">
+        <text
+           id="text975"><tspan
+             font-family="Helvetica"
+             id="tspan973">6</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g989">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,145.61 L78.42,145.61  "
+         id="path981" />
+      <g
+         transform="translate(65.80,148.86)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="end"
+         id="g987">
+        <text
+           id="text985"><tspan
+             font-family="Helvetica"
+             id="tspan983">8</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g999">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,88.56 L78.42,88.56  "
+         id="path991" />
+      <g
+         transform="translate(65.80,91.81)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="end"
+         id="g997">
+        <text
+           id="text995"><tspan
+             font-family="Helvetica"
+             id="tspan993">10</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1009">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,31.51 L78.42,31.51  "
+         id="path1001" />
+      <g
+         transform="translate(65.80,34.76)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="end"
+         id="g1007">
+        <text
+           id="text1005"><tspan
+             font-family="Helvetica"
+             id="tspan1003">12</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1019">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M159.60,373.80 L159.60,368.18  "
+         id="path1011" />
+      <g
+         transform="translate(159.60,392.05)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="middle"
+         id="g1017">
+        <text
+           id="text1015"><tspan
+             font-family="Helvetica"
+             id="tspan1013">2</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1029">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M246.40,373.80 L246.40,368.18  "
+         id="path1021" />
+      <g
+         transform="translate(246.40,392.05)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="middle"
+         id="g1027">
+        <text
+           id="text1025"><tspan
+             font-family="Helvetica"
+             id="tspan1023">4</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1039">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M333.19,373.80 L333.19,368.18  "
+         id="path1031" />
+      <g
+         transform="translate(333.19,392.05)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="middle"
+         id="g1037">
+        <text
+           id="text1035"><tspan
+             font-family="Helvetica"
+             id="tspan1033">6</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1049">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M419.99,373.80 L419.99,368.18  "
+         id="path1041" />
+      <g
+         transform="translate(419.99,392.05)"
+         stroke="none"
+         fill="rgb(38,38,38)"
+         font-family="Helvetica"
+         font-size="10.00"
+         text-anchor="middle"
+         id="g1047">
+        <text
+           id="text1045"><tspan
+             font-family="Helvetica"
+             id="tspan1043">8</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1051" />
+    <g
+       fill="none"
+       color="black"
+       stroke="rgb(  0,   0,   0)"
+       stroke-width="1.00"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1053" />
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="1.00"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1057">
+      <path
+         stroke="black"
+         d="M72.80,373.80 L506.79,373.80  "
+         id="path1055" />
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="black"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1059" />
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1063">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,31.51 L72.80,373.80 L506.79,373.80 L506.79,31.51 L72.80,31.51 Z  "
+         id="path1061" />
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1071">
+      <g
+         transform="translate(42.62,202.66) rotate(270)"
+         stroke="none"
+         fill="rgb(0,0,0)"
+         font-family="Helvetica"
+         font-size="11.00"
+         text-anchor="middle"
+         id="g1069">
+        <text
+           id="text1067"><tspan
+             font-family="Helvetica"
+             id="tspan1065">Latency (μs)</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1079">
+      <g
+         transform="translate(289.79,414.88)"
+         stroke="none"
+         fill="rgb(0,0,0)"
+         font-family="Helvetica"
+         font-size="11.00"
+         text-anchor="middle"
+         id="g1077">
+        <text
+           id="text1075"><tspan
+             font-family="Helvetica"
+             id="tspan1073">Data Size (KiB)</tspan></text>
+      </g>
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1081" />
+    <g
+       id="gnuplot_plot_1a">
+      <title
+         id="title1083">'-'</title>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1091">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1087">
+          <polygon
+             fill="rgb(  0, 113, 188)"
+             points="139.63,373.80 153.53,373.80 153.53,256.13 139.63,256.13 "
+             id="polygon1085" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M139.63,373.80 L139.63,256.14 L153.52,256.14 L153.52,373.80 L139.63,373.80 Z  "
+           id="path1089" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1099">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1095">
+          <polygon
+             fill="rgb(  0, 113, 188)"
+             points="226.43,373.80 240.33,373.80 240.33,177.73 226.43,177.73 "
+             id="polygon1093" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M226.43,373.80 L226.43,177.74 L240.32,177.74 L240.32,373.80 L226.43,373.80 Z  "
+           id="path1097" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1107">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1103">
+          <polygon
+             fill="rgb(  0, 113, 188)"
+             points="313.23,373.80 327.13,373.80 327.13,117.80 313.23,117.80 "
+             id="polygon1101" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M313.23,373.80 L313.23,117.81 L327.12,117.81 L327.12,373.80 L313.23,373.80 Z  "
+           id="path1105" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1115">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1111">
+          <polygon
+             fill="rgb(  0, 113, 188)"
+             points="400.03,373.80 413.93,373.80 413.93,41.97 400.03,41.97 "
+             id="polygon1109" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M400.03,373.80 L400.03,41.98 L413.92,41.98 L413.92,373.80 L400.03,373.80 Z  "
+           id="path1113" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1117" />
+    </g>
+    <g
+       id="gnuplot_plot_2a">
+      <title
+         id="title1120">'-'</title>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1128">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1124">
+          <polygon
+             fill="rgb(216,  82,  24)"
+             points="148.31,373.80 162.21,373.80 162.21,342.27 148.31,342.27 "
+             id="polygon1122" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M148.31,373.80 L148.31,342.28 L162.20,342.28 L162.20,373.80 L148.31,373.80 Z  "
+           id="path1126" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1136">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1132">
+          <polygon
+             fill="rgb(216,  82,  24)"
+             points="235.11,373.80 249.01,373.80 249.01,332.66 235.11,332.66 "
+             id="polygon1130" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M235.11,373.80 L235.11,332.67 L249.00,332.67 L249.00,373.80 L235.11,373.80 Z  "
+           id="path1134" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1144">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1140">
+          <polygon
+             fill="rgb(216,  82,  24)"
+             points="321.91,373.80 335.81,373.80 335.81,321.79 321.91,321.79 "
+             id="polygon1138" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M321.91,373.80 L321.91,321.80 L335.80,321.80 L335.80,373.80 L321.91,373.80 Z  "
+           id="path1142" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1152">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1148">
+          <polygon
+             fill="rgb(216,  82,  24)"
+             points="408.71,373.80 422.61,373.80 422.61,317.92 408.71,317.92 "
+             id="polygon1146" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M408.71,373.80 L408.71,317.93 L422.60,317.93 L422.60,373.80 L408.71,373.80 Z  "
+           id="path1150" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1154" />
+    </g>
+    <g
+       id="gnuplot_plot_3a">
+      <title
+         id="title1157">'-'</title>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1165">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1161">
+          <polygon
+             fill="rgb(236, 176,  31)"
+             points="156.99,373.80 170.89,373.80 170.89,286.25 156.99,286.25 "
+             id="polygon1159" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M156.99,373.80 L156.99,286.26 L170.88,286.26 L170.88,373.80 L156.99,373.80 Z  "
+           id="path1163" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1173">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1169">
+          <polygon
+             fill="rgb(236, 176,  31)"
+             points="243.79,373.80 257.69,373.80 257.69,283.54 243.79,283.54 "
+             id="polygon1167" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M243.79,373.80 L243.79,283.55 L257.68,283.55 L257.68,373.80 L243.79,373.80 Z  "
+           id="path1171" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1181">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1177">
+          <polygon
+             fill="rgb(236, 176,  31)"
+             points="330.59,373.80 344.49,373.80 344.49,285.24 330.59,285.24 "
+             id="polygon1175" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M330.59,373.80 L330.59,285.25 L344.48,285.25 L344.48,373.80 L330.59,373.80 Z  "
+           id="path1179" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1189">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1185">
+          <polygon
+             fill="rgb(236, 176,  31)"
+             points="417.39,373.80 431.29,373.80 431.29,284.14 417.39,284.14 "
+             id="polygon1183" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M417.39,373.80 L417.39,284.15 L431.28,284.15 L431.28,373.80 L417.39,373.80 Z  "
+           id="path1187" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1191" />
+    </g>
+    <g
+       id="gnuplot_plot_4a">
+      <title
+         id="title1194">'-'</title>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1202">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1198">
+          <polygon
+             fill="rgb(125,  46, 141)"
+             points="165.67,373.80 179.57,373.80 179.57,364.97 165.67,364.97 "
+             id="polygon1196" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M165.67,373.80 L165.67,364.98 L179.56,364.98 L179.56,373.80 L165.67,373.80 Z  "
+           id="path1200" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1210">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1206">
+          <polygon
+             fill="rgb(125,  46, 141)"
+             points="252.47,373.80 266.37,373.80 266.37,368.39 252.47,368.39 "
+             id="polygon1204" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M252.47,373.80 L252.47,368.40 L266.36,368.40 L266.36,373.80 L252.47,373.80 Z  "
+           id="path1208" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1218">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1214">
+          <polygon
+             fill="rgb(125,  46, 141)"
+             points="339.27,373.80 353.17,373.80 353.17,367.85 339.27,367.85 "
+             id="polygon1212" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M339.27,373.80 L339.27,367.86 L353.16,367.86 L353.16,373.80 L339.27,373.80 Z  "
+           id="path1216" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1226">
+        <g
+           stroke="none"
+           shape-rendering="crispEdges"
+           id="g1222">
+          <polygon
+             fill="rgb(125,  46, 141)"
+             points="426.07,373.80 439.97,373.80 439.97,367.68 426.07,367.68 "
+             id="polygon1220" />
+        </g>
+        <path
+           stroke="rgb(  0,   0,   0)"
+           d="M426.07,373.80 L426.07,367.69 L439.96,367.69 L439.96,373.80 L426.07,373.80 Z  "
+           id="path1224" />
+      </g>
+      <g
+         fill="none"
+         color="black"
+         stroke="currentColor"
+         stroke-width="0.50"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g1228" />
+    </g>
+    <g
+       fill="none"
+       color="white"
+       stroke="rgb(125,  46, 141)"
+       stroke-width="2.00"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1231" />
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="2.00"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1233" />
+    <g
+       fill="none"
+       color="black"
+       stroke="black"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1235" />
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1239">
+      <path
+         stroke="rgb(  0,   0,   0)"
+         d="M72.80,31.51 L72.80,373.80 L506.79,373.80 L506.79,31.51 L72.80,31.51 Z  "
+         id="path1237" />
+    </g>
+    <g
+       fill="none"
+       color="black"
+       stroke="currentColor"
+       stroke-width="0.50"
+       stroke-linecap="butt"
+       stroke-linejoin="miter"
+       id="g1241" />
+  </g>
+  <g
+     id="g841"
+     transform="translate(-272.43437,6.5824777)">
+    <g
+       id="g1236">
+      <g
+         fill="none"
+         color="#000000"
+         stroke="currentColor"
+         stroke-width="0.5"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g194">
+        <path
+           stroke="#000000"
+           d="m 361.56,105.01 v -66 h 138.23 v 66 z"
+           id="path192" />
+      </g>
+      <g
+         fill="none"
+         color="#000000"
+         stroke="currentColor"
+         stroke-width="0.5"
+         stroke-linecap="butt"
+         stroke-linejoin="miter"
+         id="g374">
+        <path
+           stroke="#000000"
+           d="m 361.56,105.01 v -66 h 138.23 v 66 z"
+           id="path372" />
+      </g>
+      <g
+         id="g422">
+        <title
+           id="title400">Put</title>
+        <g
+           fill="none"
+           color="#ffffff"
+           stroke="#7d2e8d"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g402" />
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g410">
+          <g
+             transform="translate(415.2,50.84)"
+             stroke="none"
+             fill="#000000"
+             font-family="Helvetica"
+             font-size="11px"
+             text-anchor="start"
+             id="g408">
+            <text
+               id="text406"><tspan
+                 font-family="Helvetica"
+                 id="tspan404">Put</tspan></text>
+          </g>
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g418">
+          <g
+             stroke="none"
+             shape-rendering="crispEdges"
+             id="g414">
+            <polygon
+               fill="#0071bc"
+               points="369.25,51.38 407.51,51.38 407.51,43.13 369.25,43.13 "
+               id="polygon412" />
+          </g>
+          <path
+             stroke="#000000"
+             d="m 369.25,51.38 h 38.26 v -8.24 h -38.26 z"
+             id="path416" />
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g420" />
+      </g>
+      <g
+         id="g444">
+        <title
+           id="title424">Get (SEQ)</title>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g432">
+          <g
+             transform="translate(415.2,67.34)"
+             stroke="none"
+             fill="#000000"
+             font-family="Helvetica"
+             font-size="11px"
+             text-anchor="start"
+             id="g430">
+            <text
+               id="text428"><tspan
+                 font-family="Helvetica"
+                 id="tspan426">Get (SEQ)</tspan></text>
+          </g>
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g440">
+          <g
+             stroke="none"
+             shape-rendering="crispEdges"
+             id="g436">
+            <polygon
+               fill="#d85218"
+               points="369.25,67.88 407.51,67.88 407.51,59.63 369.25,59.63 "
+               id="polygon434" />
+          </g>
+          <path
+             stroke="#000000"
+             d="m 369.25,67.88 h 38.26 v -8.24 h -38.26 z"
+             id="path438" />
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g442" />
+      </g>
+      <g
+         id="g466">
+        <title
+           id="title446">Get (RAND)</title>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g454">
+          <g
+             transform="translate(415.2,83.84)"
+             stroke="none"
+             fill="#000000"
+             font-family="Helvetica"
+             font-size="11px"
+             text-anchor="start"
+             id="g452">
+            <text
+               id="text450"><tspan
+                 font-family="Helvetica"
+                 id="tspan448">Get (RAND)</tspan></text>
+          </g>
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g462">
+          <g
+             stroke="none"
+             shape-rendering="crispEdges"
+             id="g458">
+            <polygon
+               fill="#ecb01f"
+               points="369.25,84.38 407.51,84.38 407.51,76.13 369.25,76.13 "
+               id="polygon456" />
+          </g>
+          <path
+             stroke="#000000"
+             d="m 369.25,84.38 h 38.26 v -8.24 h -38.26 z"
+             id="path460" />
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g464" />
+      </g>
+      <g
+         id="g488">
+        <title
+           id="title468">Delete</title>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g476">
+          <g
+             transform="translate(415.2,100.34)"
+             stroke="none"
+             fill="#000000"
+             font-family="Helvetica"
+             font-size="11px"
+             text-anchor="start"
+             id="g474">
+            <text
+               id="text472"><tspan
+                 font-family="Helvetica"
+                 id="tspan470">Delete</tspan></text>
+          </g>
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g484">
+          <g
+             stroke="none"
+             shape-rendering="crispEdges"
+             id="g480">
+            <polygon
+               fill="#7d2e8d"
+               points="369.25,100.88 407.51,100.88 407.51,92.63 369.25,92.63 "
+               id="polygon478" />
+          </g>
+          <path
+             stroke="#000000"
+             d="m 369.25,100.88 h 38.26 v -8.24 h -38.26 z"
+             id="path482" />
+        </g>
+        <g
+           fill="none"
+           color="#000000"
+           stroke="currentColor"
+           stroke-width="1"
+           stroke-linecap="butt"
+           stroke-linejoin="miter"
+           id="g486" />
+      </g>
+    </g>
+  </g>
+</svg>
