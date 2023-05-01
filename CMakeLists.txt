@@ -30,5 +30,8 @@ if (LSMKV_BUILD_TESTS)
 
         add_executable(lsmkv_prof_compaction test/prof_compaction.cpp)
         target_link_libraries(lsmkv_prof_compaction PRIVATE lsmkv Matplot++::matplot)
+
+        add_executable(lsmkv_prof_level test/prof_level.cpp)
+        target_link_libraries(lsmkv_prof_level PRIVATE lsmkv Matplot++::matplot)
     endif ()
 endif ()

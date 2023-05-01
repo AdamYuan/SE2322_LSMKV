@@ -26,7 +26,7 @@ int main() {
 				                     }
 			                     }) /
 			                     (double)count;
-			printf("PUT: %.20lf prof_sec\n", put_avg_sec);
+			printf("PUT: %.20lf sec\n", put_avg_sec);
 			put_us_vec.push_back(put_avg_sec * 1000000.0);
 			put_tp_vec.push_back(1.0 / put_avg_sec);
 		}
@@ -37,7 +37,7 @@ int main() {
 				                         }
 			                         }) /
 			                         (double)count;
-			printf("GET(SEQ): %.20lf prof_sec\n", get_seq_avg_sec);
+			printf("GET(SEQ): %.20lf sec\n", get_seq_avg_sec);
 			get_seq_us_vec.push_back(get_seq_avg_sec * 1000000.0);
 			get_seq_tp_vec.push_back(1.0 / get_seq_avg_sec);
 		}
@@ -53,7 +53,7 @@ int main() {
 				                         }
 			                         }) /
 			                         (double)count;
-			printf("GET(RND): %.20lf prof_sec\n", get_rnd_avg_sec);
+			printf("GET(RND): %.20lf sec\n", get_rnd_avg_sec);
 			get_rnd_us_vec.push_back(get_rnd_avg_sec * 1000000.0);
 			get_rnd_tp_vec.push_back(1.0 / get_rnd_avg_sec);
 		}
@@ -64,7 +64,7 @@ int main() {
 				                     }
 			                     }) /
 			                     (double)count;
-			printf("DEL: %.20lf prof_sec\n", del_avg_sec);
+			printf("DEL: %.20lf sec\n", del_avg_sec);
 			del_us_vec.push_back(del_avg_sec * 1000000.0);
 			del_tp_vec.push_back(1.0 / del_avg_sec);
 		}
