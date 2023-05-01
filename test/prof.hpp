@@ -21,10 +21,13 @@ template <typename Key> struct Murmur3BloomHasher {
 	}
 };
 
+template <typename Key>
+using StandardBloom = lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>;
+
 template <typename Key> struct StandardTrait : public lsm::KVDefaultTrait<Key, std::string> {
 	using Compare = std::less<Key>;
 	using Container = lsm::SkipList<Key, lsm::KVMemValue<std::string>, Compare, std::default_random_engine, 1, 2, 32>;
-	using KeyFile = lsm::KVCachedBloomKeyFile<Key, StandardTrait, lsm::Bloom<Key, 10240 * 8, Murmur3BloomHasher<Key>>>;
+	using KeyFile = lsm::KVCachedBloomKeyFile<Key, StandardTrait, StandardBloom<Key>>;
 	constexpr static lsm::size_type kMaxFileSize = 2 * 1024 * 1024;
 
 	constexpr static lsm::KVLevelConfig kLevelConfigs[] = {{2, lsm::KVLevelType::kTiering},
